@@ -233,6 +233,21 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.dashboard-grid,
+.charts-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.charts-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.wide-chart {
+  grid-column: 1 / -1;
+}
+
 .stat-card,
 .panel,
 .toolbar {
@@ -307,6 +322,34 @@ tbody span,
   gap: 10px;
   grid-template-columns: minmax(240px, 1fr) repeat(3, minmax(160px, 210px));
   padding: 12px;
+}
+
+.period-selector {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  width: fit-content;
+}
+
+.period-selector button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted);
+  font-weight: 800;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.period-selector button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
 }
 
 .search-input {
@@ -475,6 +518,61 @@ tbody span {
   gap: 10px;
 }
 
+.incident-list,
+.rank-list {
+  display: grid;
+  gap: 10px;
+}
+
+.incident-item,
+.rank-list button {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 12px;
+}
+
+.incident-item {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr auto;
+}
+
+.incident-item strong,
+.rank-list span {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.incident-item span,
+.incident-item time,
+.rank-list small {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.incident-item > div:last-child {
+  text-align: right;
+}
+
+.rank-list button {
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  text-align: left;
+}
+
+.rank-list button:hover {
+  background: #f8fafb;
+}
+
+.rank-list strong {
+  color: var(--accent-strong);
+  font-size: 1.15rem;
+}
+
 .failure-item {
   align-items: center;
   border: 1px solid var(--line);
@@ -586,6 +684,10 @@ tbody span {
   display: grid;
   gap: 20px;
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+}
+
+.chart-panel {
+  min-height: 360px;
 }
 
 .detail-list {
@@ -705,7 +807,9 @@ tbody span {
 @media (max-width: 900px) {
   .app-shell,
   .login-screen,
-  .detail-grid {
+  .detail-grid,
+  .dashboard-grid,
+  .charts-grid {
     grid-template-columns: 1fr;
   }
 
@@ -770,6 +874,23 @@ tbody span {
   .failure-item {
     align-items: flex-start;
     grid-template-columns: 1fr;
+  }
+
+  .incident-item {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+  }
+
+  .incident-item > div:last-child {
+    text-align: left;
+  }
+
+  .period-selector {
+    width: 100%;
+  }
+
+  .period-selector button {
+    flex: 1;
   }
 
   .login-metrics {

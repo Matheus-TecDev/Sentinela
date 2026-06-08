@@ -38,3 +38,9 @@ class MonitoredService(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    incidents = relationship(
+        "Incident",
+        back_populates="service",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

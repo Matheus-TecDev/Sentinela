@@ -2,11 +2,12 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.enums import HealthStatus, ServiceEnvironment
+from app.core.periods import Period, period_start
 from app.models.health_check import HealthCheckResult
 from app.models.service import MonitoredService
 from app.repositories.health_check_repository import HealthCheckRepository
 from app.repositories.service_repository import ServiceRepository
-from app.schemas.service import ServiceCreate, ServiceDetail, ServiceUpdate, ServiceWithStatus
+from app.schemas.service import ServiceCreate, ServiceDetail, ServicePeriodMetrics, ServiceUpdate, ServiceWithStatus
 
 
 def serialize_service_with_status(
@@ -56,6 +57,25 @@ class ServiceService:
             uptime_percent=self.checks.uptime_percent(db, service_id=service.id),
             recent_checks=self.checks.recent_for_service(db, service_id=service.id, limit=50),
             recent_failures=self.checks.recent_failures(db, service_id=service.id, limit=10),
+        )
+
+    def period_metrics(self, db: Session, service_id: int, period: Period) -> ServicePeriodMetrics:
+        self._get_or_404(db, service_id)
+        since = period_start(period)
+        max_response, min_response = self.checks.response_extremes(db, service_id=service_id, since=since)
+        last_failure = self.checks.recent_failures(db, service_id=service_id, limit=1, since=since)
+        last_check = self.checks.latest_for_service(db, service_id=service_id, since=since)
+        return ServicePeriodMetrics(
+            period=period,
+            uptime_percent=self.checks.uptime_percent(db, service_id=service_id, since=since),
+            average_response_time_ms=self.checks.average_response_time(db, service_id=service_id, since=since),
+            max_response_time_ms=max_response,
+            min_response_time_ms=min_response,
+            total_checks=self.checks.total_for_service(db, service_id=service_id, since=since),
+            total_failures=self.checks.failure_count(db, service_id=service_id, since=since),
+            last_failure=last_failure[0] if last_failure else None,
+            last_status=last_check.status if last_check else None,
+            status_counts=self.checks.status_counts_for_service(db, service_id=service_id, since=since),
         )
 
     def create(self, db: Session, payload: ServiceCreate) -> ServiceWithStatus:

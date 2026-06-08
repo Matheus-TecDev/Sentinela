@@ -76,3 +76,16 @@ class ServiceDetail(ServiceWithStatus):
     uptime_percent: float
     recent_checks: list[HealthCheckResultRead]
     recent_failures: list[HealthCheckResultRead]
+
+
+class ServicePeriodMetrics(BaseModel):
+    period: str
+    uptime_percent: float
+    average_response_time_ms: float | None
+    max_response_time_ms: float | None
+    min_response_time_ms: float | None
+    total_checks: int
+    total_failures: int
+    last_failure: HealthCheckResultRead | None
+    last_status: HealthStatus | None
+    status_counts: dict[HealthStatus, int]

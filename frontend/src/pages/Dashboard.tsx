@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, Gauge, Server, TimerReset, Wifi } from "lucide-react";
+import { Activity, AlertTriangle, Gauge, RadioTower, Server, ShieldAlert, TimerReset, Wifi } from "lucide-react";
 
 import type { PageProps } from "../App";
 import { apiRequest } from "../api/client";
@@ -10,7 +10,15 @@ import { Loading } from "../components/Loading";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import type { DashboardSummary, HealthCheckResult } from "../types";
-import { environmentLabel, formatDate, formatMs, formatPercent, visualStatus } from "../utils";
+import {
+  environmentLabel,
+  formatDate,
+  formatDuration,
+  formatMs,
+  formatPercent,
+  incidentStatusLabel,
+  visualStatus
+} from "../utils";
 
 export function Dashboard({ navigate }: PageProps) {
   const { token } = useAuth();
@@ -62,8 +70,83 @@ export function Dashboard({ navigate }: PageProps) {
             <StatCard title="Online" value={data.online_services} helper="Operacional" icon={Wifi} tone="good" />
             <StatCard title="Offline" value={data.offline_services} helper="Requer atenção" icon={AlertTriangle} tone="bad" />
             <StatCard title="Degradados" value={data.degraded_services} helper="acima do limite" icon={TimerReset} tone="warn" />
+            <StatCard title="Incidentes abertos" value={data.open_incidents} helper="em acompanhamento" icon={ShieldAlert} tone={data.open_incidents ? "bad" : "good"} />
+            <StatCard title="Falhas em 24h" value={data.failures_last_24h} helper="verificações offline" icon={RadioTower} tone={data.failures_last_24h ? "bad" : "good"} />
             <StatCard title="Resposta média" value={formatMs(data.average_response_time_ms)} helper="Histórico geral" icon={Gauge} />
             <StatCard title="Uptime geral" value={formatPercent(data.overall_uptime_percent)} helper="online + degradado" icon={Activity} tone="good" />
+          </section>
+
+          <section className="dashboard-grid">
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <h3>Incidentes recentes</h3>
+                  <span>Eventos abertos ou resolvidos mais recentemente</span>
+                </div>
+              </div>
+              {data.recent_incidents.length === 0 ? (
+                <EmptyState title="Sem incidentes" message="Nenhum incidente foi registrado até o momento." />
+              ) : (
+                <div className="incident-list">
+                  {data.recent_incidents.map((incident) => (
+                    <div className="incident-item" key={incident.id} onClick={() => navigate(`/services/${incident.service_id}`)}>
+                      <div>
+                        <strong>{incident.service_name}</strong>
+                        <span>{incident.reason}</span>
+                      </div>
+                      <div>
+                        <span>{incidentStatusLabel(incident.status)}</span>
+                        <time>{formatDuration(incident.duration_seconds)}</time>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <h3>Serviços mais instáveis</h3>
+                  <span>Mais verificações offline ou degradadas nas últimas 24 horas</span>
+                </div>
+              </div>
+              {data.unstable_services.length === 0 ? (
+                <EmptyState title="Sem instabilidade recente" message="Nenhum serviço teve falhas ou degradação nas últimas 24 horas." />
+              ) : (
+                <div className="rank-list">
+                  {data.unstable_services.map((item) => (
+                    <button key={item.service_id} onClick={() => navigate(`/services/${item.service_id}`)}>
+                      <span>{item.service_name}</span>
+                      <strong>{item.unhealthy_checks}</strong>
+                      <small>{item.failure_checks} offline | {item.incident_count} incidentes</small>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <h3>Piores tempos de resposta</h3>
+                  <span>Maiores médias nas últimas 24 horas</span>
+                </div>
+              </div>
+              {data.slowest_services.length === 0 ? (
+                <EmptyState title="Sem tempos recentes" message="Nenhuma resposta HTTP foi registrada nas últimas 24 horas." />
+              ) : (
+                <div className="rank-list">
+                  {data.slowest_services.map((item) => (
+                    <button key={item.service_id} onClick={() => navigate(`/services/${item.service_id}`)}>
+                      <span>{item.service_name}</span>
+                      <strong>{formatMs(item.average_response_time_ms)}</strong>
+                      <small>tempo médio</small>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </section>
 
           <section className="panel">

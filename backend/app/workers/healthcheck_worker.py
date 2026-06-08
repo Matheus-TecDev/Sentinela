@@ -9,6 +9,7 @@ from app.db.session import SessionLocal
 from app.repositories.health_check_repository import HealthCheckRepository
 from app.repositories.service_repository import ServiceRepository
 from app.services.health_check_service import perform_health_check
+from app.services.incident_service import IncidentService
 
 logger = logging.getLogger(__name__)
 _scheduler: AsyncIOScheduler | None = None
@@ -18,6 +19,7 @@ async def execute_healthchecks() -> None:
     settings = get_settings()
     service_repository = ServiceRepository()
     check_repository = HealthCheckRepository()
+    incident_service = IncidentService()
 
     with SessionLocal() as db:
         services = service_repository.list_active(db)
@@ -31,7 +33,8 @@ async def execute_healthchecks() -> None:
         for service in services:
             result = await perform_health_check(service, client, settings)
             with SessionLocal() as db:
-                check_repository.create(db, result)
+                check = check_repository.create(db, result)
+                incident_service.sync_from_check(db, check)
             logger.info(
                 "Healthcheck completed service_id=%s status=%s response_time_ms=%s",
                 service.id,

@@ -30,10 +30,10 @@ async def perform_health_check(
             )
         else:
             status = HealthStatus.OFFLINE
-            error_message = f"Unexpected HTTP status {response.status_code}"
+            error_message = f"Status HTTP inesperado: {response.status_code}"
     except httpx.TimeoutException as exc:
         status = HealthStatus.OFFLINE
-        error_message = f"Timeout: {exc}"
+        error_message = f"Timeout na verificação: {exc}"
     except httpx.HTTPError as exc:
         status = HealthStatus.OFFLINE
         error_message = str(exc)

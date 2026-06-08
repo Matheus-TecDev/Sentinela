@@ -17,3 +17,8 @@ class HealthStatus(str, Enum):
     ONLINE = "online"
     OFFLINE = "offline"
     DEGRADED = "degraded"
+
+
+class IncidentStatus(str, Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"

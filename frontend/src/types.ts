@@ -1,6 +1,8 @@
 export type UserRole = "ADMIN" | "OPERATOR" | "VIEWER";
 export type ServiceEnvironment = "dev" | "staging" | "production";
 export type HealthStatus = "online" | "offline" | "degraded";
+export type IncidentStatus = "open" | "resolved";
+export type MetricsPeriod = "24h" | "7d" | "30d";
 
 export interface User {
   id: number;
@@ -38,6 +40,36 @@ export interface HealthCheckResult {
   checked_at: string;
 }
 
+export interface Incident {
+  id: number;
+  service_id: number;
+  status: IncidentStatus;
+  started_at: string;
+  resolved_at: string | null;
+  duration_seconds: number | null;
+  reason: string;
+  last_error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IncidentWithService extends Incident {
+  service_name: string;
+}
+
+export interface ServicePeriodMetrics {
+  period: MetricsPeriod;
+  uptime_percent: number;
+  average_response_time_ms: number | null;
+  max_response_time_ms: number | null;
+  min_response_time_ms: number | null;
+  total_checks: number;
+  total_failures: number;
+  last_failure: HealthCheckResult | null;
+  last_status: HealthStatus | null;
+  status_counts: Partial<Record<HealthStatus, number>>;
+}
+
 export interface ServiceDetail extends MonitoredService {
   average_response_time_ms: number | null;
   uptime_percent: number;
@@ -53,8 +85,27 @@ export interface DashboardSummary {
   inactive_services: number;
   average_response_time_ms: number | null;
   overall_uptime_percent: number;
+  open_incidents: number;
+  failures_last_24h: number;
   recent_failures: HealthCheckResult[];
+  recent_incidents: IncidentWithService[];
+  unstable_services: ServiceInstabilitySummary[];
+  slowest_services: ServiceResponseSummary[];
   services: MonitoredService[];
+}
+
+export interface ServiceInstabilitySummary {
+  service_id: number;
+  service_name: string;
+  unhealthy_checks: number;
+  failure_checks: number;
+  incident_count: number;
+}
+
+export interface ServiceResponseSummary {
+  service_id: number;
+  service_name: string;
+  average_response_time_ms: number;
 }
 
 export interface ServicePayload {
