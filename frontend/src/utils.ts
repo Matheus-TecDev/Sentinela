@@ -1,4 +1,12 @@
-import type { HealthStatus, IncidentStatus, MetricsPeriod, MonitoredService } from "./types";
+import type {
+  AlertChannelType,
+  HealthStatus,
+  IncidentStatus,
+  MetricsPeriod,
+  MonitoredService,
+  NotificationEventType,
+  NotificationStatus
+} from "./types";
 
 export function formatDate(value: string | null): string {
   if (!value) return "Sem registro";
@@ -41,6 +49,27 @@ export function healthStatusLabel(status: HealthStatus | null): string {
 
 export function incidentStatusLabel(status: IncidentStatus): string {
   return status === "open" ? "Aberto" : "Resolvido";
+}
+
+export function alertChannelLabel(type: AlertChannelType): string {
+  const labels: Record<AlertChannelType, string> = {
+    webhook: "Webhook",
+    discord: "Discord",
+    email: "E-mail"
+  };
+  return labels[type];
+}
+
+export function notificationEventLabel(type: NotificationEventType): string {
+  const labels: Record<NotificationEventType, string> = {
+    incident_opened: "Incidente aberto",
+    incident_resolved: "Serviço recuperado"
+  };
+  return labels[type];
+}
+
+export function notificationStatusLabel(status: NotificationStatus): string {
+  return status === "sent" ? "Alerta enviado" : "Falha ao enviar alerta";
 }
 
 export function periodLabel(period: MetricsPeriod): string {

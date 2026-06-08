@@ -1,12 +1,15 @@
 from sqlalchemy.orm import Session
 
-from app.core.enums import HealthStatus
+from app.core.enums import HealthStatus, NotificationStatus
 from app.core.periods import period_start
 from app.repositories.health_check_repository import HealthCheckRepository
 from app.repositories.incident_repository import IncidentRepository
+from app.repositories.notification_repository import NotificationLogRepository
 from app.repositories.service_repository import ServiceRepository
+from app.schemas.alert import NotificationLogWithService
 from app.schemas.dashboard import DashboardSummary, ServiceInstabilitySummary, ServiceResponseSummary
 from app.schemas.incident import IncidentWithService
+from app.services.alert_service import mask_target
 from app.services.service_service import serialize_service_with_status
 
 
@@ -15,6 +18,7 @@ class DashboardService:
         self.services = ServiceRepository()
         self.checks = HealthCheckRepository()
         self.incidents = IncidentRepository()
+        self.notifications = NotificationLogRepository()
 
     def summary(self, db: Session) -> DashboardSummary:
         services = self.services.list(db)
@@ -47,6 +51,28 @@ class DashboardService:
             )
             for service_id, name, average in self.checks.slowest_services_since(db, last_24h, limit=5)
         ]
+        recent_notifications = [
+            NotificationLogWithService.model_validate(
+                {
+                    **notification.__dict__,
+                    "masked_target": mask_target(notification.target),
+                    "service_name": service_name,
+                }
+            )
+            for notification, service_name in self.notifications.recent_with_service(db, limit=10)
+        ]
+        failed_notifications = [
+            NotificationLogWithService.model_validate(
+                {
+                    **notification.__dict__,
+                    "masked_target": mask_target(notification.target),
+                    "service_name": service_name,
+                }
+            )
+            for notification, service_name in self.notifications.recent_with_service(
+                db, limit=10, status=NotificationStatus.FAILED
+            )
+        ]
 
         return DashboardSummary(
             total_services=len(services),
@@ -60,6 +86,8 @@ class DashboardService:
             failures_last_24h=self.checks.failure_count(db, since=last_24h),
             recent_failures=self.checks.recent_failures(db, limit=10),
             recent_incidents=recent_incidents,
+            recent_notifications=recent_notifications,
+            failed_notifications=failed_notifications,
             unstable_services=unstable_services,
             slowest_services=slowest_services,
             services=serialized,

@@ -3,6 +3,9 @@ export type ServiceEnvironment = "dev" | "staging" | "production";
 export type HealthStatus = "online" | "offline" | "degraded";
 export type IncidentStatus = "open" | "resolved";
 export type MetricsPeriod = "24h" | "7d" | "30d";
+export type AlertChannelType = "webhook" | "discord" | "email";
+export type NotificationEventType = "incident_opened" | "incident_resolved";
+export type NotificationStatus = "sent" | "failed";
 
 export interface User {
   id: number;
@@ -57,6 +60,44 @@ export interface IncidentWithService extends Incident {
   service_name: string;
 }
 
+export interface AlertChannel {
+  id: number;
+  service_id: number;
+  type: AlertChannelType;
+  masked_target: string;
+  is_active: boolean;
+  notify_on_offline: boolean;
+  notify_on_degraded: boolean;
+  notify_on_recovery: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlertChannelPayload {
+  type?: AlertChannelType;
+  target?: string;
+  is_active?: boolean;
+  notify_on_offline?: boolean;
+  notify_on_degraded?: boolean;
+  notify_on_recovery?: boolean;
+}
+
+export interface NotificationLog {
+  id: number;
+  service_id: number;
+  incident_id: number | null;
+  channel_type: AlertChannelType;
+  masked_target: string;
+  event_type: NotificationEventType;
+  status: NotificationStatus;
+  error_message: string | null;
+  sent_at: string;
+}
+
+export interface NotificationLogWithService extends NotificationLog {
+  service_name: string;
+}
+
 export interface ServicePeriodMetrics {
   period: MetricsPeriod;
   uptime_percent: number;
@@ -89,6 +130,8 @@ export interface DashboardSummary {
   failures_last_24h: number;
   recent_failures: HealthCheckResult[];
   recent_incidents: IncidentWithService[];
+  recent_notifications: NotificationLogWithService[];
+  failed_notifications: NotificationLogWithService[];
   unstable_services: ServiceInstabilitySummary[];
   slowest_services: ServiceResponseSummary[];
   services: MonitoredService[];

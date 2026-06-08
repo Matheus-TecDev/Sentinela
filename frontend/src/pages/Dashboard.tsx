@@ -11,12 +11,15 @@ import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import type { DashboardSummary, HealthCheckResult } from "../types";
 import {
+  alertChannelLabel,
   environmentLabel,
   formatDate,
   formatDuration,
   formatMs,
   formatPercent,
   incidentStatusLabel,
+  notificationEventLabel,
+  notificationStatusLabel,
   visualStatus
 } from "../utils";
 
@@ -143,6 +146,62 @@ export function Dashboard({ navigate }: PageProps) {
                       <strong>{formatMs(item.average_response_time_ms)}</strong>
                       <small>tempo médio</small>
                     </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="dashboard-grid two-columns">
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <h3>Últimas notificações</h3>
+                  <span>Alertas enviados ou tentados recentemente</span>
+                </div>
+              </div>
+              {data.recent_notifications.length === 0 ? (
+                <EmptyState title="Sem notificações" message="Nenhuma tentativa de alerta foi registrada." />
+              ) : (
+                <div className="notification-list">
+                  {data.recent_notifications.map((notification) => (
+                    <div className="notification-item" key={notification.id}>
+                      <div>
+                        <strong>{notification.service_name}</strong>
+                        <span>{notificationEventLabel(notification.event_type)}</span>
+                      </div>
+                      <div>
+                        <span>{alertChannelLabel(notification.channel_type)}</span>
+                        <small>{notificationStatusLabel(notification.status)}</small>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="panel">
+              <div className="panel-heading">
+                <div>
+                  <h3>Falhas de envio de alerta</h3>
+                  <span>Canais que precisam de revisão operacional</span>
+                </div>
+              </div>
+              {data.failed_notifications.length === 0 ? (
+                <EmptyState title="Sem falhas de envio" message="Nenhum alerta falhou recentemente." />
+              ) : (
+                <div className="notification-list">
+                  {data.failed_notifications.map((notification) => (
+                    <div className="notification-item failed" key={notification.id}>
+                      <div>
+                        <strong>{notification.service_name}</strong>
+                        <span>{notification.masked_target}</span>
+                      </div>
+                      <div>
+                        <span>{notification.error_message ?? "Falha ao enviar alerta"}</span>
+                        <small>{formatDate(notification.sent_at)}</small>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}

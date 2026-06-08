@@ -234,10 +234,16 @@ button {
 }
 
 .dashboard-grid,
+.alert-grid,
 .charts-grid {
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-grid.two-columns,
+.alert-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .charts-grid {
@@ -519,12 +525,16 @@ tbody span {
 }
 
 .incident-list,
+.alert-list,
+.notification-list,
 .rank-list {
   display: grid;
   gap: 10px;
 }
 
 .incident-item,
+.alert-item,
+.notification-item,
 .rank-list button {
   background: #ffffff;
   border: 1px solid var(--line);
@@ -533,7 +543,9 @@ tbody span {
   padding: 12px;
 }
 
-.incident-item {
+.incident-item,
+.alert-item,
+.notification-item {
   align-items: center;
   display: grid;
   gap: 12px;
@@ -541,6 +553,8 @@ tbody span {
 }
 
 .incident-item strong,
+.alert-item strong,
+.notification-item strong,
 .rank-list span {
   display: block;
   margin-bottom: 3px;
@@ -548,13 +562,46 @@ tbody span {
 
 .incident-item span,
 .incident-item time,
+.alert-item span,
+.alert-item small,
+.notification-item span,
+.notification-item small,
 .rank-list small {
   color: var(--muted);
   font-size: 0.85rem;
 }
 
-.incident-item > div:last-child {
+.incident-item > div:last-child,
+.notification-item > div:last-child {
   text-align: right;
+}
+
+.notification-item.failed {
+  border-color: #ffd4cf;
+  background: #fffafa;
+}
+
+.alert-form {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.alert-form label {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.86rem;
+  font-weight: 700;
+  gap: 7px;
+}
+
+.alert-form .check-row,
+.alert-actions {
+  grid-column: 1 / -1;
+}
+
+.alert-actions {
+  gap: 8px;
 }
 
 .rank-list button {
@@ -809,6 +856,7 @@ tbody span {
   .login-screen,
   .detail-grid,
   .dashboard-grid,
+  .alert-grid,
   .charts-grid {
     grid-template-columns: 1fr;
   }
@@ -876,13 +924,20 @@ tbody span {
     grid-template-columns: 1fr;
   }
 
-  .incident-item {
+  .incident-item,
+  .alert-item,
+  .notification-item {
     align-items: flex-start;
     grid-template-columns: 1fr;
   }
 
-  .incident-item > div:last-child {
+  .incident-item > div:last-child,
+  .notification-item > div:last-child {
     text-align: left;
+  }
+
+  .alert-form {
+    grid-template-columns: 1fr;
   }
 
   .period-selector {

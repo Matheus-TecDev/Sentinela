@@ -1,8 +1,9 @@
 from datetime import datetime
+from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.core.enums import HealthStatus, IncidentStatus
+from app.core.enums import HealthStatus, IncidentStatus, NotificationEventType
 from app.models.health_check import HealthCheckResult
 from app.models.incident import Incident
 from app.repositories.incident_repository import IncidentRepository
@@ -20,11 +21,17 @@ def duration_seconds(started_at: datetime, resolved_at: datetime) -> int:
     return max(0, int((resolved_at - started_at).total_seconds()))
 
 
+@dataclass(frozen=True)
+class IncidentTransition:
+    incident: Incident
+    event_type: NotificationEventType | None
+
+
 class IncidentService:
     def __init__(self) -> None:
         self.incidents = IncidentRepository()
 
-    def sync_from_check(self, db: Session, check: HealthCheckResult) -> Incident | None:
+    def sync_from_check(self, db: Session, check: HealthCheckResult) -> IncidentTransition | None:
         open_incident = self.incidents.open_for_service(db, check.service_id)
 
         if check.status in (HealthStatus.OFFLINE, HealthStatus.DEGRADED):
@@ -33,8 +40,9 @@ class IncidentService:
                 "last_error_message": check.error_message,
             }
             if open_incident:
-                return self.incidents.update(db, open_incident, data)
-            return self.incidents.create(
+                incident = self.incidents.update(db, open_incident, data)
+                return IncidentTransition(incident=incident, event_type=None)
+            incident = self.incidents.create(
                 db,
                 {
                     "service_id": check.service_id,
@@ -43,9 +51,10 @@ class IncidentService:
                     **data,
                 },
             )
+            return IncidentTransition(incident=incident, event_type=NotificationEventType.INCIDENT_OPENED)
 
         if check.status == HealthStatus.ONLINE and open_incident:
-            return self.incidents.update(
+            incident = self.incidents.update(
                 db,
                 open_incident,
                 {
@@ -54,5 +63,6 @@ class IncidentService:
                     "duration_seconds": duration_seconds(open_incident.started_at, check.checked_at),
                 },
             )
+            return IncidentTransition(incident=incident, event_type=NotificationEventType.INCIDENT_RESOLVED)
 
         return None

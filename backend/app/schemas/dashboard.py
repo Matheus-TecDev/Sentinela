@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+from app.schemas.alert import NotificationLogWithService
 from app.schemas.health_check import HealthCheckResultRead
 from app.schemas.incident import IncidentWithService
 from app.schemas.service import ServiceWithStatus
@@ -31,6 +32,8 @@ class DashboardSummary(BaseModel):
     failures_last_24h: int
     recent_failures: list[HealthCheckResultRead]
     recent_incidents: list[IncidentWithService]
+    recent_notifications: list[NotificationLogWithService]
+    failed_notifications: list[NotificationLogWithService]
     unstable_services: list[ServiceInstabilitySummary]
     slowest_services: list[ServiceResponseSummary]
     services: list[ServiceWithStatus]

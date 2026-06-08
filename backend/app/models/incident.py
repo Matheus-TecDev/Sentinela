@@ -38,3 +38,4 @@ class Incident(Base):
     )
 
     service = relationship("MonitoredService", back_populates="incidents")
+    notification_logs = relationship("NotificationLog", back_populates="incident")

@@ -44,3 +44,15 @@ class MonitoredService(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    alert_channels = relationship(
+        "AlertChannel",
+        back_populates="service",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    notification_logs = relationship(
+        "NotificationLog",
+        back_populates="service",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

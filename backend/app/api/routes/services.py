@@ -8,6 +8,13 @@ from app.db.session import get_db
 from app.models.user import User
 from app.repositories.health_check_repository import HealthCheckRepository
 from app.repositories.incident_repository import IncidentRepository
+from app.schemas.alert import (
+    AlertChannelActivationUpdate,
+    AlertChannelCreate,
+    AlertChannelRead,
+    AlertChannelUpdate,
+    NotificationLogRead,
+)
 from app.schemas.health_check import HealthCheckResultRead
 from app.schemas.incident import IncidentRead
 from app.schemas.service import (
@@ -18,12 +25,14 @@ from app.schemas.service import (
     ServiceUpdate,
     ServiceWithStatus,
 )
+from app.services.alert_service import AlertService
 from app.services.service_service import ServiceService
 
 router = APIRouter(prefix="/services", tags=["services"])
 service_service = ServiceService()
 health_check_repository = HealthCheckRepository()
 incident_repository = IncidentRepository()
+alert_service = AlertService()
 
 
 @router.get("", response_model=list[ServiceWithStatus])
@@ -93,6 +102,62 @@ def service_incidents(
 ) -> list[IncidentRead]:
     service_service.get_detail(db, service_id)
     return incident_repository.list_for_service(db, service_id=service_id, limit=limit)
+
+
+@router.get("/{service_id}/alerts", response_model=list[AlertChannelRead])
+def service_alerts(
+    service_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(viewer_access),
+) -> list[AlertChannelRead]:
+    service_service.get_detail(db, service_id)
+    return alert_service.list_channels(db, service_id=service_id)
+
+
+@router.post("/{service_id}/alerts", response_model=AlertChannelRead, status_code=201)
+def create_service_alert(
+    service_id: int,
+    payload: AlertChannelCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(operator_access),
+) -> AlertChannelRead:
+    service_service.get_detail(db, service_id)
+    return alert_service.create_channel(db, service_id=service_id, payload=payload)
+
+
+@router.put("/{service_id}/alerts/{alert_id}", response_model=AlertChannelRead)
+def update_service_alert(
+    service_id: int,
+    alert_id: int,
+    payload: AlertChannelUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(operator_access),
+) -> AlertChannelRead:
+    service_service.get_detail(db, service_id)
+    return alert_service.update_channel(db, service_id=service_id, alert_id=alert_id, payload=payload)
+
+
+@router.patch("/{service_id}/alerts/{alert_id}/activation", response_model=AlertChannelRead)
+def set_service_alert_activation(
+    service_id: int,
+    alert_id: int,
+    payload: AlertChannelActivationUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(operator_access),
+) -> AlertChannelRead:
+    service_service.get_detail(db, service_id)
+    return alert_service.set_activation(db, service_id=service_id, alert_id=alert_id, is_active=payload.is_active)
+
+
+@router.get("/{service_id}/notifications", response_model=list[NotificationLogRead])
+def service_notifications(
+    service_id: int,
+    limit: int = Query(default=50, ge=1, le=500),
+    db: Session = Depends(get_db),
+    _: User = Depends(viewer_access),
+) -> list[NotificationLogRead]:
+    service_service.get_detail(db, service_id)
+    return alert_service.list_notifications(db, service_id=service_id, limit=limit)
 
 
 @router.put("/{service_id}", response_model=ServiceWithStatus)

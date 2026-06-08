@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Edit3, Power, RadioTower, Timer, TrendingDown, TrendingUp, Wifi } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Bell, BellOff, Edit3, Power, RadioTower, Save, Timer, TrendingDown, TrendingUp, Wifi } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -23,8 +23,19 @@ import { ErrorBanner } from "../components/ErrorBanner";
 import { Loading } from "../components/Loading";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
-import type { HealthCheckResult, Incident, MetricsPeriod, ServiceDetail, ServicePeriodMetrics } from "../types";
+import type {
+  AlertChannel,
+  AlertChannelPayload,
+  AlertChannelType,
+  HealthCheckResult,
+  Incident,
+  MetricsPeriod,
+  NotificationLog,
+  ServiceDetail,
+  ServicePeriodMetrics
+} from "../types";
 import {
+  alertChannelLabel,
   environmentLabel,
   formatDate,
   formatDuration,
@@ -32,6 +43,8 @@ import {
   formatPercent,
   healthStatusLabel,
   incidentStatusLabel,
+  notificationEventLabel,
+  notificationStatusLabel,
   periodLabel,
   visualStatus
 } from "../utils";
@@ -47,30 +60,48 @@ const statusColors = {
   offline: "#b42318"
 };
 
+const initialAlertForm = {
+  type: "webhook" as AlertChannelType,
+  target: "",
+  is_active: true,
+  notify_on_offline: true,
+  notify_on_degraded: true,
+  notify_on_recovery: true
+};
+
 export function ServiceDetailPage({ serviceId, navigate }: ServiceDetailPageProps) {
   const { token, canManageServices } = useAuth();
   const [service, setService] = useState<ServiceDetail | null>(null);
   const [checks, setChecks] = useState<HealthCheckResult[]>([]);
   const [metrics, setMetrics] = useState<ServicePeriodMetrics | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [alerts, setAlerts] = useState<AlertChannel[]>([]);
+  const [notifications, setNotifications] = useState<NotificationLog[]>([]);
+  const [alertForm, setAlertForm] = useState(initialAlertForm);
+  const [editingAlertId, setEditingAlertId] = useState<number | null>(null);
   const [period, setPeriod] = useState<MetricsPeriod>("24h");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [savingAlert, setSavingAlert] = useState(false);
 
   async function load(): Promise<void> {
     try {
       setLoading(true);
       setError("");
-      const [detail, history, periodMetrics, serviceIncidents] = await Promise.all([
+      const [detail, history, periodMetrics, serviceIncidents, serviceAlerts, notificationHistory] = await Promise.all([
         apiRequest<ServiceDetail>(`/services/${serviceId}`, {}, token),
         apiRequest<HealthCheckResult[]>(`/services/${serviceId}/checks?limit=200&period=${period}`, {}, token),
         apiRequest<ServicePeriodMetrics>(`/services/${serviceId}/metrics?period=${period}`, {}, token),
-        apiRequest<Incident[]>(`/services/${serviceId}/incidents?limit=20`, {}, token)
+        apiRequest<Incident[]>(`/services/${serviceId}/incidents?limit=20`, {}, token),
+        apiRequest<AlertChannel[]>(`/services/${serviceId}/alerts`, {}, token),
+        apiRequest<NotificationLog[]>(`/services/${serviceId}/notifications?limit=20`, {}, token)
       ]);
       setService(detail);
       setChecks(history);
       setMetrics(periodMetrics);
       setIncidents(serviceIncidents);
+      setAlerts(serviceAlerts);
+      setNotifications(notificationHistory);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao carregar detalhes do serviço");
     } finally {
@@ -97,6 +128,78 @@ export function ServiceDetailPage({ serviceId, navigate }: ServiceDetailPageProp
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao atualizar serviço");
     }
+  }
+
+  async function saveAlert(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    if (!service) return;
+    try {
+      setSavingAlert(true);
+      setError("");
+      const payload: AlertChannelPayload = {
+        type: alertForm.type,
+        is_active: alertForm.is_active,
+        notify_on_offline: alertForm.notify_on_offline,
+        notify_on_degraded: alertForm.notify_on_degraded,
+        notify_on_recovery: alertForm.notify_on_recovery
+      };
+      if (alertForm.target.trim()) {
+        payload.target = alertForm.target.trim();
+      }
+      if (!editingAlertId && !payload.target) {
+        setError("Informe o destino do alerta.");
+        return;
+      }
+      const endpoint = editingAlertId
+        ? `/services/${service.id}/alerts/${editingAlertId}`
+        : `/services/${service.id}/alerts`;
+      const method = editingAlertId ? "PUT" : "POST";
+      await apiRequest<AlertChannel>(
+        endpoint,
+        {
+          method,
+          body: JSON.stringify(payload)
+        },
+        token
+      );
+      setAlertForm(initialAlertForm);
+      setEditingAlertId(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao salvar canal de alerta");
+    } finally {
+      setSavingAlert(false);
+    }
+  }
+
+  async function toggleAlert(alert: AlertChannel): Promise<void> {
+    if (!service) return;
+    try {
+      setError("");
+      await apiRequest<AlertChannel>(
+        `/services/${service.id}/alerts/${alert.id}/activation`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ is_active: !alert.is_active })
+        },
+        token
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao atualizar canal de alerta");
+    }
+  }
+
+  function editAlert(alert: AlertChannel): void {
+    setEditingAlertId(alert.id);
+    setAlertForm({
+      type: alert.type,
+      target: "",
+      is_active: alert.is_active,
+      notify_on_offline: alert.notify_on_offline,
+      notify_on_degraded: alert.notify_on_degraded,
+      notify_on_recovery: alert.notify_on_recovery
+    });
   }
 
   const chronologicalChecks = useMemo(() => [...checks].reverse(), [checks]);
@@ -246,6 +349,171 @@ export function ServiceDetailPage({ serviceId, navigate }: ServiceDetailPageProp
             </div>
           )}
         </div>
+      </section>
+
+      <section className="alert-grid">
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <h3>Configurações de alerta</h3>
+              <span>Canais acionados quando incidentes abrirem ou forem resolvidos</span>
+            </div>
+          </div>
+          {canManageServices ? (
+            <form className="alert-form" onSubmit={saveAlert}>
+              <label>
+                Canal
+                <select
+                  value={alertForm.type}
+                  onChange={(event) => setAlertForm({ ...alertForm, type: event.target.value as AlertChannelType })}
+                >
+                  <option value="webhook">Webhook genérico</option>
+                  <option value="discord">Discord Webhook</option>
+                  <option value="email">E-mail SMTP (preparado)</option>
+                </select>
+              </label>
+              <label>
+                Destino
+                <input
+                  value={alertForm.target}
+                  onChange={(event) => setAlertForm({ ...alertForm, target: event.target.value })}
+                  placeholder={editingAlertId ? "Deixe vazio para manter o destino atual" : "https://..."}
+                />
+              </label>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={alertForm.is_active}
+                  onChange={(event) => setAlertForm({ ...alertForm, is_active: event.target.checked })}
+                />
+                Canal ativo
+              </label>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={alertForm.notify_on_offline}
+                  onChange={(event) => setAlertForm({ ...alertForm, notify_on_offline: event.target.checked })}
+                />
+                Alertar quando ficar offline
+              </label>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={alertForm.notify_on_degraded}
+                  onChange={(event) => setAlertForm({ ...alertForm, notify_on_degraded: event.target.checked })}
+                />
+                Alertar quando degradar
+              </label>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={alertForm.notify_on_recovery}
+                  onChange={(event) => setAlertForm({ ...alertForm, notify_on_recovery: event.target.checked })}
+                />
+                Alertar quando recuperar
+              </label>
+              <div className="form-actions alert-actions">
+                {editingAlertId && (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => {
+                      setEditingAlertId(null);
+                      setAlertForm(initialAlertForm);
+                    }}
+                  >
+                    Cancelar edição
+                  </button>
+                )}
+                <button className="primary-button fit" disabled={savingAlert}>
+                  <Save size={16} aria-hidden="true" />
+                  {savingAlert ? "Salvando..." : editingAlertId ? "Salvar alterações" : "Adicionar canal"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <EmptyState title="Somente leitura" message="Seu perfil permite consultar alertas, mas não alterar canais." />
+          )}
+        </div>
+
+        <div className="panel">
+          <div className="panel-heading">
+            <div>
+              <h3>Canais configurados</h3>
+              <span>Destinos mascarados para proteger tokens e credenciais</span>
+            </div>
+          </div>
+          {alerts.length === 0 ? (
+            <EmptyState title="Nenhum alerta configurado" message="Adicione um webhook para receber notificações de incidentes." />
+          ) : (
+            <div className="alert-list">
+              {alerts.map((alert) => (
+                <div className="alert-item" key={alert.id}>
+                  <div>
+                    <strong>{alertChannelLabel(alert.type)}</strong>
+                    <span>{alert.masked_target}</span>
+                    <small>
+                      {[
+                        alert.notify_on_offline ? "offline" : null,
+                        alert.notify_on_degraded ? "degradado" : null,
+                        alert.notify_on_recovery ? "recuperação" : null
+                      ]
+                        .filter(Boolean)
+                        .join(" | ")}
+                    </small>
+                  </div>
+                  <div className="row-actions">
+                    <button className="icon-button" onClick={() => editAlert(alert)} title="Editar canal">
+                      <Edit3 size={16} aria-hidden="true" />
+                    </button>
+                    <button className="icon-button" onClick={() => toggleAlert(alert)} title="Ativar ou desativar">
+                      {alert.is_active ? <Bell size={16} aria-hidden="true" /> : <BellOff size={16} aria-hidden="true" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <h3>Histórico de notificações</h3>
+            <span>Tentativas de envio registradas para este serviço</span>
+          </div>
+        </div>
+        {notifications.length === 0 ? (
+          <EmptyState title="Sem notificações" message="Nenhum alerta foi enviado para este serviço." />
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Evento</th>
+                  <th>Canal</th>
+                  <th>Destino</th>
+                  <th>Status</th>
+                  <th>Erro</th>
+                  <th>Enviado em</th>
+                </tr>
+              </thead>
+              <tbody>
+                {notifications.map((notification) => (
+                  <tr key={notification.id}>
+                    <td>{notificationEventLabel(notification.event_type)}</td>
+                    <td>{alertChannelLabel(notification.channel_type)}</td>
+                    <td>{notification.masked_target}</td>
+                    <td>{notificationStatusLabel(notification.status)}</td>
+                    <td>{notification.error_message ?? "-"}</td>
+                    <td>{formatDate(notification.sent_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="charts-grid">

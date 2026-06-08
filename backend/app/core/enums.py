@@ -22,3 +22,19 @@ class HealthStatus(str, Enum):
 class IncidentStatus(str, Enum):
     OPEN = "open"
     RESOLVED = "resolved"
+
+
+class AlertChannelType(str, Enum):
+    WEBHOOK = "webhook"
+    DISCORD = "discord"
+    EMAIL = "email"
+
+
+class NotificationEventType(str, Enum):
+    INCIDENT_OPENED = "incident_opened"
+    INCIDENT_RESOLVED = "incident_resolved"
+
+
+class NotificationStatus(str, Enum):
+    SENT = "sent"
+    FAILED = "failed"
