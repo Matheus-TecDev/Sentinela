@@ -11,7 +11,8 @@ class ServiceBase(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     environment: ServiceEnvironment
     healthcheck_url: str = Field(..., min_length=8, max_length=2048)
-    owner: str = Field(..., min_length=2, max_length=120)
+    owner: str | None = Field(default=None, min_length=2, max_length=120)
+    responsible_id: int | None = None
     is_active: bool = True
 
     @field_validator("healthcheck_url")
@@ -33,6 +34,7 @@ class ServiceUpdate(BaseModel):
     environment: ServiceEnvironment | None = None
     healthcheck_url: str | None = Field(default=None, min_length=8, max_length=2048)
     owner: str | None = Field(default=None, min_length=2, max_length=120)
+    responsible_id: int | None = None
     is_active: bool | None = None
 
     @field_validator("healthcheck_url")
@@ -59,6 +61,7 @@ class ServiceRead(BaseModel):
     environment: ServiceEnvironment
     healthcheck_url: str
     owner: str
+    responsible_id: int | None
     is_active: bool
     created_at: datetime
     updated_at: datetime

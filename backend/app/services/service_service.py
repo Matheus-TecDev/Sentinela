@@ -6,6 +6,7 @@ from app.core.periods import Period, period_start
 from app.models.health_check import HealthCheckResult
 from app.models.service import MonitoredService
 from app.repositories.health_check_repository import HealthCheckRepository
+from app.repositories.responsible_repository import ResponsibleRepository
 from app.repositories.service_repository import ServiceRepository
 from app.schemas.service import ServiceCreate, ServiceDetail, ServicePeriodMetrics, ServiceUpdate, ServiceWithStatus
 
@@ -31,6 +32,7 @@ class ServiceService:
     def __init__(self) -> None:
         self.services = ServiceRepository()
         self.checks = HealthCheckRepository()
+        self.responsibles = ResponsibleRepository()
 
     def list(
         self,
@@ -79,12 +81,14 @@ class ServiceService:
         )
 
     def create(self, db: Session, payload: ServiceCreate) -> ServiceWithStatus:
-        service = self.services.create(db, payload.model_dump())
+        data = self._normalize_responsible(db, payload.model_dump())
+        service = self.services.create(db, data)
         return serialize_service_with_status(service)
 
     def update(self, db: Session, service_id: int, payload: ServiceUpdate) -> ServiceWithStatus:
         service = self._get_or_404(db, service_id)
         data = payload.model_dump(exclude_unset=True)
+        data = self._normalize_responsible(db, data, current_owner=service.owner)
         service = self.services.update(db, service, data)
         latest = self.checks.latest_by_service(db).get(service.id)
         return serialize_service_with_status(service, latest)
@@ -100,3 +104,25 @@ class ServiceService:
         if service is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Serviço não encontrado")
         return service
+
+    def _normalize_responsible(
+        self,
+        db: Session,
+        data: dict,
+        current_owner: str | None = None,
+    ) -> dict:
+        responsible_id = data.get("responsible_id")
+        if responsible_id is not None:
+            responsible = self.responsibles.get(db, responsible_id)
+            if responsible is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Responsável não encontrado")
+            data["owner"] = responsible.name
+            return data
+
+        if "owner" not in data or data.get("owner") is None:
+            if current_owner is not None:
+                data.pop("owner", None)
+                return data
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Informe um responsável")
+
+        return data

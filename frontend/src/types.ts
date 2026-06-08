@@ -24,6 +24,7 @@ export interface MonitoredService {
   environment: ServiceEnvironment;
   healthcheck_url: string;
   owner: string;
+  responsible_id: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -156,6 +157,24 @@ export interface ServicePayload {
   description: string | null;
   environment: ServiceEnvironment;
   healthcheck_url: string;
-  owner: string;
+  owner?: string | null;
+  responsible_id: number | null;
+  is_active: boolean;
+}
+
+export interface Responsible {
+  id: number;
+  name: string;
+  email: string | null;
+  team: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResponsiblePayload {
+  name: string;
+  email: string | null;
+  team: string | null;
   is_active: boolean;
 }

@@ -47,6 +47,15 @@ export function healthStatusLabel(status: HealthStatus | null): string {
   return status ? labels[status] : "Sem registro";
 }
 
+export function userRoleLabel(role: string): string {
+  const labels: Record<string, string> = {
+    ADMIN: "Administrador",
+    OPERATOR: "Operador",
+    VIEWER: "Visualizador"
+  };
+  return labels[role] ?? role;
+}
+
 export function incidentStatusLabel(status: IncidentStatus): string {
   return status === "open" ? "Aberto" : "Resolvido";
 }

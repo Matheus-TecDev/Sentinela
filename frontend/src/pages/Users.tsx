@@ -6,6 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { Loading } from "../components/Loading";
+import { SelectField, type SelectOption } from "../components/SelectField";
 import type { User, UserRole } from "../types";
 import { formatDate } from "../utils";
 
@@ -22,6 +23,12 @@ const initialForm: UserForm = {
   password: "",
   role: "VIEWER"
 };
+
+const roleOptions: Array<SelectOption<UserRole>> = [
+  { value: "ADMIN", label: "Administrador" },
+  { value: "OPERATOR", label: "Operador" },
+  { value: "VIEWER", label: "Visualizador" }
+];
 
 export function UsersPage() {
   const { token } = useAuth();
@@ -106,7 +113,7 @@ export function UsersPage() {
       <div className="page-heading">
         <div>
           <span className="eyebrow">Controle de acesso</span>
-          <h2>Administração de usuários</h2>
+          <h2>Usuários</h2>
         </div>
       </div>
 
@@ -116,7 +123,7 @@ export function UsersPage() {
         <div className="panel-heading wide">
           <div>
             <h3>Novo usuário</h3>
-            <span>Crie contas com perfis de operação, administração ou leitura</span>
+            <span>Defina o perfil de acesso antes de liberar a conta.</span>
           </div>
         </div>
         <label>
@@ -124,7 +131,7 @@ export function UsersPage() {
           <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
         </label>
         <label>
-          Email
+          E-mail
           <input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required />
         </label>
         <label>
@@ -139,11 +146,11 @@ export function UsersPage() {
         </label>
         <label>
           Perfil
-          <select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as UserRole })}>
-            <option value="VIEWER">VIEWER</option>
-            <option value="OPERATOR">OPERATOR</option>
-            <option value="ADMIN">ADMIN</option>
-          </select>
+          <SelectField
+            value={roleOptions.find((option) => option.value === form.role)}
+            options={roleOptions}
+            onChange={(option) => option && setForm({ ...form, role: option.value })}
+          />
         </label>
         <div className="form-actions wide">
           <button className="primary-button fit" disabled={saving}>
@@ -156,8 +163,8 @@ export function UsersPage() {
       <section className="panel">
         <div className="panel-heading">
           <div>
-            <h3>Usuários</h3>
-            <span>Controle de permissões aplicado pela API</span>
+            <h3>Contas cadastradas</h3>
+            <span>Perfis aplicados nas permissões da API.</span>
           </div>
           <UsersIcon size={20} aria-hidden="true" />
         </div>
@@ -171,8 +178,8 @@ export function UsersPage() {
               <thead>
                 <tr>
                   <th>Nome</th>
-                  <th>Email</th>
-                  <th>Role</th>
+                  <th>E-mail</th>
+                  <th>Perfil</th>
                   <th>Status</th>
                   <th>Criado em</th>
                   <th>Ações</th>
@@ -187,16 +194,16 @@ export function UsersPage() {
                     </td>
                     <td>{user.email}</td>
                     <td>
-                      <select value={user.role} onChange={(event) => updateRole(user, event.target.value as UserRole)}>
-                        <option value="VIEWER">VIEWER</option>
-                        <option value="OPERATOR">OPERATOR</option>
-                        <option value="ADMIN">ADMIN</option>
-                      </select>
+                      <SelectField
+                        value={roleOptions.find((option) => option.value === user.role)}
+                        options={roleOptions}
+                        onChange={(option) => option && updateRole(user, option.value)}
+                      />
                     </td>
                     <td>{user.is_active ? "Ativo" : "Inativo"}</td>
                     <td>{formatDate(user.created_at)}</td>
                     <td>
-                      <button className="icon-button" onClick={() => toggleUser(user)} title="Ativar ou desativar">
+                      <button className="icon-button" onClick={() => toggleUser(user)} title="Ativar ou desativar" type="button">
                         {user.is_active ? <Power size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
                       </button>
                     </td>

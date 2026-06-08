@@ -7,11 +7,32 @@ import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { Loading } from "../components/Loading";
+import { SelectField, type SelectOption } from "../components/SelectField";
 import { StatusBadge } from "../components/StatusBadge";
 import type { HealthStatus, MonitoredService, ServiceEnvironment } from "../types";
 import { environmentLabel, formatDate, formatMs, visualStatus } from "../utils";
 
 type ActiveFilter = "" | "true" | "false";
+
+const environmentOptions: Array<SelectOption<ServiceEnvironment | "">> = [
+  { value: "", label: "Todos os ambientes" },
+  { value: "dev", label: "Dev" },
+  { value: "staging", label: "Staging" },
+  { value: "production", label: "Produção" }
+];
+
+const statusOptions: Array<SelectOption<HealthStatus | "">> = [
+  { value: "", label: "Todos os status" },
+  { value: "online", label: "Online" },
+  { value: "offline", label: "Offline" },
+  { value: "degraded", label: "Degradado" }
+];
+
+const activeOptions: Array<SelectOption<ActiveFilter>> = [
+  { value: "", label: "Ativos e inativos" },
+  { value: "true", label: "Somente ativos" },
+  { value: "false", label: "Somente inativos" }
+];
 
 export function ServicesPage({ navigate }: PageProps) {
   const { token, canManageServices } = useAuth();
@@ -69,11 +90,11 @@ export function ServicesPage({ navigate }: PageProps) {
     <div className="page-stack">
       <div className="page-heading">
         <div>
-          <span className="eyebrow">Aplicações monitoradas</span>
+          <span className="eyebrow">Serviços</span>
           <h2>Serviços monitorados</h2>
         </div>
         {canManageServices && (
-          <button className="primary-button fit" onClick={() => navigate("/services/new")}>
+          <button className="primary-button fit" onClick={() => navigate("/services/new")} type="button">
             <Plus size={16} aria-hidden="true" />
             Novo serviço
           </button>
@@ -87,42 +108,41 @@ export function ServicesPage({ navigate }: PageProps) {
           <Search size={16} aria-hidden="true" />
           <input placeholder="Pesquisar por nome" value={q} onChange={(event) => setQ(event.target.value)} />
         </label>
-        <select value={environment} onChange={(event) => setEnvironment(event.target.value as ServiceEnvironment | "")}>
-          <option value="">Todos os ambientes</option>
-          <option value="dev">Dev</option>
-          <option value="staging">Staging</option>
-          <option value="production">Produção</option>
-        </select>
-        <select value={status} onChange={(event) => setStatus(event.target.value as HealthStatus | "")}>
-          <option value="">Todos os status</option>
-          <option value="online">Online</option>
-          <option value="offline">Offline</option>
-          <option value="degraded">Degradado</option>
-        </select>
-        <select value={active} onChange={(event) => setActive(event.target.value as ActiveFilter)}>
-          <option value="">Ativos e inativos</option>
-          <option value="true">Somente ativos</option>
-          <option value="false">Somente inativos</option>
-        </select>
+        <SelectField
+          value={environmentOptions.find((option) => option.value === environment)}
+          options={environmentOptions}
+          onChange={(option) => setEnvironment(option?.value ?? "")}
+        />
+        <SelectField
+          value={statusOptions.find((option) => option.value === status)}
+          options={statusOptions}
+          onChange={(option) => setStatus(option?.value ?? "")}
+        />
+        <SelectField
+          value={activeOptions.find((option) => option.value === active)}
+          options={activeOptions}
+          onChange={(option) => setActive(option?.value ?? "")}
+        />
       </section>
 
       <section className="panel">
         <div className="panel-heading">
           <div>
-            <h3>Serviços monitorados</h3>
-            <span>Controle de verificações, responsáveis e ambientes</span>
+            <h3>Inventário</h3>
+            <span>Serviços, responsáveis e status de monitoramento.</span>
           </div>
         </div>
         {loading ? (
           <Loading />
         ) : services.length === 0 ? (
-          <EmptyState title="Nenhum serviço encontrado" message="Ajuste os filtros ou cadastre uma nova aplicação." />
+          <EmptyState title="Nenhum serviço encontrado" message="Ajuste os filtros ou cadastre um serviço." />
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>Nome</th>
+                  <th>Responsável</th>
                   <th>Ambiente</th>
                   <th>Status</th>
                   <th>HTTP</th>
@@ -134,10 +154,11 @@ export function ServicesPage({ navigate }: PageProps) {
               <tbody>
                 {services.map((service) => (
                   <tr key={service.id}>
-                    <td onClick={() => navigate(`/services/${service.id}`)}>
+                    <td className="clickable-cell" onClick={() => navigate(`/services/${service.id}`)}>
                       <strong>{service.name}</strong>
                       <span>{service.healthcheck_url}</span>
                     </td>
+                    <td>{service.owner}</td>
                     <td>{environmentLabel(service.environment)}</td>
                     <td>
                       <StatusBadge status={visualStatus(service)} />
@@ -147,15 +168,25 @@ export function ServicesPage({ navigate }: PageProps) {
                     <td>{formatDate(service.last_checked_at)}</td>
                     <td>
                       <div className="row-actions">
-                        <button className="icon-button" onClick={() => navigate(`/services/${service.id}`)} title="Detalhes">
+                        <button className="icon-button" onClick={() => navigate(`/services/${service.id}`)} title="Detalhes" type="button">
                           <Server size={16} aria-hidden="true" />
                         </button>
                         {canManageServices && (
                           <>
-                            <button className="icon-button" onClick={() => navigate(`/services/${service.id}/edit`)} title="Editar">
+                            <button
+                              className="icon-button"
+                              onClick={() => navigate(`/services/${service.id}/edit`)}
+                              title="Editar"
+                              type="button"
+                            >
                               <Edit3 size={16} aria-hidden="true" />
                             </button>
-                            <button className="icon-button" onClick={() => toggleService(service)} title="Ativar ou desativar">
+                            <button
+                              className="icon-button"
+                              onClick={() => toggleService(service)}
+                              title="Ativar ou desativar"
+                              type="button"
+                            >
                               <Power size={16} aria-hidden="true" />
                             </button>
                           </>

@@ -1,13 +1,5 @@
-import {
-  Activity,
-  Gauge,
-  LogOut,
-  Menu,
-  Server,
-  Shield,
-  Users
-} from "lucide-react";
-import type { ReactNode } from "react";
+import { Activity, ChevronLeft, Gauge, LogOut, Server, Shield, Users } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
 import { useAuth } from "../auth/AuthContext";
 
@@ -18,7 +10,8 @@ interface LayoutProps {
 }
 
 export function Layout({ children, currentPath, navigate }: LayoutProps) {
-  const { user, logout, canManageUsers } = useAuth();
+  const { user, logout, canManageUsers, canManageServices } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   function isActive(path: string): boolean {
     if (path === "/dashboard") return currentPath === "/" || currentPath === "/dashboard";
@@ -31,63 +24,93 @@ export function Layout({ children, currentPath, navigate }: LayoutProps) {
   }
 
   return (
-    <div className="app-shell">
+    <div className={sidebarOpen ? "app-shell" : "app-shell sidebar-collapsed"}>
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">
+          <button
+            className="brand-mark"
+            onClick={() => !sidebarOpen && setSidebarOpen(true)}
+            title={sidebarOpen ? "Sentinel" : "Expandir menu"}
+            type="button"
+          >
             <Shield size={22} aria-hidden="true" />
-          </div>
-          <div>
-            <strong>Sentinel</strong>
-            <span>Plataforma de Observabilidade</span>
-          </div>
+          </button>
+          {sidebarOpen && (
+            <>
+              <div className="brand-copy">
+                <strong>Sentinel</strong>
+                <span>Observabilidade corporativa</span>
+              </div>
+              <button className="sidebar-toggle" onClick={() => setSidebarOpen(false)} title="Recolher menu" type="button">
+                <ChevronLeft size={18} aria-hidden="true" />
+              </button>
+            </>
+          )}
         </div>
 
         <nav className="nav-list" aria-label="Principal">
           <button
             className={isActive("/dashboard") ? "nav-item active" : "nav-item"}
             onClick={() => navigate("/dashboard")}
+            title="Dashboard"
+            type="button"
           >
             <Gauge size={18} aria-hidden="true" />
-            Dashboard
+            {sidebarOpen && <span>Dashboard</span>}
           </button>
           <button
             className={isActive("/services") ? "nav-item active" : "nav-item"}
             onClick={() => navigate("/services")}
+            title="Serviços"
+            type="button"
           >
             <Server size={18} aria-hidden="true" />
-            Serviços
+            {sidebarOpen && <span>Serviços</span>}
           </button>
+          {canManageServices && (
+            <button
+              className={isActive("/responsibles") ? "nav-item active" : "nav-item"}
+              onClick={() => navigate("/responsibles")}
+              title="Responsáveis"
+              type="button"
+            >
+              <Users size={18} aria-hidden="true" />
+              {sidebarOpen && <span>Responsáveis</span>}
+            </button>
+          )}
           {canManageUsers && (
             <button
               className={isActive("/users") ? "nav-item active" : "nav-item"}
               onClick={() => navigate("/users")}
+              title="Usuários"
+              type="button"
             >
               <Users size={18} aria-hidden="true" />
-              Usuários
+              {sidebarOpen && <span>Usuários</span>}
             </button>
           )}
         </nav>
 
-        <div className="sidebar-footer">
-          <Activity size={16} aria-hidden="true" />
-          <span>Preparado para integração com Prometheus</span>
-        </div>
+        {sidebarOpen && (
+          <div className="sidebar-footer">
+            <Activity size={16} aria-hidden="true" />
+            <span>Monitoramento ativo</span>
+          </div>
+        )}
       </aside>
 
       <div className="main-area">
         <header className="topbar">
           <div>
-            <div className="eyebrow">Monitoramento corporativo</div>
-            <h1>Visão Operacional</h1>
+            <div className="eyebrow">Operação</div>
+            <h1>Visão operacional</h1>
           </div>
           <div className="topbar-actions">
             <div className="user-pill">
-              <Menu size={16} aria-hidden="true" />
               <span>{user?.name}</span>
               <strong>{user?.role}</strong>
             </div>
-            <button className="icon-button" onClick={handleLogout} title="Sair">
+            <button className="icon-button" onClick={handleLogout} title="Sair" type="button">
               <LogOut size={18} aria-hidden="true" />
             </button>
           </div>

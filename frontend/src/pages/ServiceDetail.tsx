@@ -21,6 +21,7 @@ import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { Loading } from "../components/Loading";
+import { SelectField, type SelectOption } from "../components/SelectField";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import type {
@@ -59,6 +60,12 @@ const statusColors = {
   degraded: "#b45309",
   offline: "#b42318"
 };
+
+const alertTypeOptions: Array<SelectOption<AlertChannelType>> = [
+  { value: "webhook", label: "Webhook genérico" },
+  { value: "discord", label: "Discord Webhook" },
+  { value: "email", label: "E-mail SMTP (preparado)" }
+];
 
 const initialAlertForm = {
   type: "webhook" as AlertChannelType,
@@ -363,14 +370,11 @@ export function ServiceDetailPage({ serviceId, navigate }: ServiceDetailPageProp
             <form className="alert-form" onSubmit={saveAlert}>
               <label>
                 Canal
-                <select
-                  value={alertForm.type}
-                  onChange={(event) => setAlertForm({ ...alertForm, type: event.target.value as AlertChannelType })}
-                >
-                  <option value="webhook">Webhook genérico</option>
-                  <option value="discord">Discord Webhook</option>
-                  <option value="email">E-mail SMTP (preparado)</option>
-                </select>
+                <SelectField
+                  value={alertTypeOptions.find((option) => option.value === alertForm.type)}
+                  options={alertTypeOptions}
+                  onChange={(option) => option && setAlertForm({ ...alertForm, type: option.value })}
+                />
               </label>
               <label>
                 Destino

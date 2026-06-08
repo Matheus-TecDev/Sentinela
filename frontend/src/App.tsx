@@ -4,6 +4,7 @@ import { useAuth } from "./auth/AuthContext";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
 import { Login } from "./pages/Login";
+import { ResponsiblesPage } from "./pages/Responsibles";
 import { ServiceDetailPage } from "./pages/ServiceDetail";
 import { ServiceFormPage } from "./pages/ServiceForm";
 import { ServicesPage } from "./pages/Services";
@@ -50,6 +51,9 @@ export default function App() {
   }
   if (path === "/users") {
     page = auth.canManageUsers ? <UsersPage /> : <Dashboard navigate={navigate} />;
+  }
+  if (path === "/responsibles") {
+    page = auth.canManageServices ? <ResponsiblesPage navigate={navigate} /> : <Dashboard navigate={navigate} />;
   }
   if (path === "/login") {
     page = <Dashboard navigate={navigate} />;

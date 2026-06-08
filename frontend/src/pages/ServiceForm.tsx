@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Save } from "lucide-react";
 
 import type { PageProps } from "../App";
@@ -6,7 +6,8 @@ import { apiRequest } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { Loading } from "../components/Loading";
-import type { ServiceDetail, ServiceEnvironment, ServicePayload } from "../types";
+import { SelectField, type SelectOption } from "../components/SelectField";
+import type { Responsible, ServiceDetail, ServiceEnvironment, ServicePayload } from "../types";
 
 interface ServiceFormPageProps extends PageProps {
   mode: "create" | "edit";
@@ -18,39 +19,63 @@ const initialForm: ServicePayload = {
   description: "",
   environment: "production",
   healthcheck_url: "",
-  owner: "",
+  responsible_id: null,
+  owner: null,
   is_active: true
 };
+
+const environmentOptions: Array<SelectOption<ServiceEnvironment>> = [
+  { value: "dev", label: "Dev" },
+  { value: "staging", label: "Staging" },
+  { value: "production", label: "Produção" }
+];
 
 export function ServiceFormPage({ mode, serviceId, navigate }: ServiceFormPageProps) {
   const { token, canManageServices } = useAuth();
   const [form, setForm] = useState<ServicePayload>(initialForm);
-  const [loading, setLoading] = useState(mode === "edit");
+  const [responsibles, setResponsibles] = useState<Responsible[]>([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     async function load(): Promise<void> {
-      if (mode !== "edit" || !serviceId) return;
       try {
         setLoading(true);
-        const service = await apiRequest<ServiceDetail>(`/services/${serviceId}`, {}, token);
-        setForm({
-          name: service.name,
-          description: service.description ?? "",
-          environment: service.environment,
-          healthcheck_url: service.healthcheck_url,
-          owner: service.owner,
-          is_active: service.is_active
-        });
+        setError("");
+        const [activeResponsibles, service] = await Promise.all([
+          apiRequest<Responsible[]>("/responsibles?is_active=true", {}, token),
+          mode === "edit" && serviceId ? apiRequest<ServiceDetail>(`/services/${serviceId}`, {}, token) : Promise.resolve(null)
+        ]);
+        setResponsibles(activeResponsibles);
+        if (service) {
+          setForm({
+            name: service.name,
+            description: service.description ?? "",
+            environment: service.environment,
+            healthcheck_url: service.healthcheck_url,
+            responsible_id: service.responsible_id,
+            owner: service.owner,
+            is_active: service.is_active
+          });
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Falha ao carregar serviço");
+        setError(err instanceof Error ? err.message : "Falha ao carregar formulário");
       } finally {
         setLoading(false);
       }
     }
     void load();
   }, [mode, serviceId, token]);
+
+  const responsibleOptions = useMemo<Array<SelectOption<number>>>(
+    () =>
+      responsibles.map((responsible) => ({
+        value: responsible.id,
+        label: responsible.team ? `${responsible.name} (${responsible.team})` : responsible.name
+      })),
+    [responsibles]
+  );
 
   function updateField<K extends keyof ServicePayload>(field: K, value: ServicePayload[K]): void {
     setForm((current) => ({ ...current, [field]: value }));
@@ -59,6 +84,10 @@ export function ServiceFormPage({ mode, serviceId, navigate }: ServiceFormPagePr
   async function handleSubmit(event: FormEvent): Promise<void> {
     event.preventDefault();
     setError("");
+    if (!form.responsible_id) {
+      setError("Selecione um responsável pelo serviço.");
+      return;
+    }
     setSaving(true);
     const payload: ServicePayload = {
       ...form,
@@ -98,10 +127,10 @@ export function ServiceFormPage({ mode, serviceId, navigate }: ServiceFormPagePr
     <div className="page-stack">
       <div className="page-heading">
         <div>
-          <span className="eyebrow">Configuração do serviço</span>
+          <span className="eyebrow">Serviço monitorado</span>
           <h2>{mode === "edit" ? "Editar serviço" : "Novo serviço"}</h2>
         </div>
-        <button className="secondary-button" onClick={() => navigate("/services")}>
+        <button className="secondary-button" onClick={() => navigate("/services")} type="button">
           <ArrowLeft size={16} aria-hidden="true" />
           Voltar
         </button>
@@ -116,18 +145,20 @@ export function ServiceFormPage({ mode, serviceId, navigate }: ServiceFormPagePr
         </label>
         <label>
           Responsável
-          <input value={form.owner} onChange={(event) => updateField("owner", event.target.value)} required />
+          <SelectField
+            value={responsibleOptions.find((option) => option.value === form.responsible_id) ?? null}
+            options={responsibleOptions}
+            onChange={(option) => updateField("responsible_id", option?.value ?? null)}
+            placeholder="Selecione um responsável"
+          />
         </label>
         <label>
           Ambiente
-          <select
-            value={form.environment}
-            onChange={(event) => updateField("environment", event.target.value as ServiceEnvironment)}
-          >
-            <option value="dev">Dev</option>
-            <option value="staging">Staging</option>
-          <option value="production">Produção</option>
-          </select>
+          <SelectField
+            value={environmentOptions.find((option) => option.value === form.environment) ?? null}
+            options={environmentOptions}
+            onChange={(option) => option && updateField("environment", option.value)}
+          />
         </label>
         <label>
           URL de verificação

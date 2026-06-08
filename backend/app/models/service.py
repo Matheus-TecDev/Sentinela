@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import ServiceEnvironment
@@ -23,6 +23,11 @@ class MonitoredService(Base):
     )
     healthcheck_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     owner: Mapped[str] = mapped_column(String(120), nullable=False)
+    responsible_id: Mapped[int | None] = mapped_column(
+        ForeignKey("responsibles.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = mapped_column(
@@ -56,3 +61,4 @@ class MonitoredService(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    responsible = relationship("Responsible", back_populates="services")
