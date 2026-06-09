@@ -38,6 +38,7 @@ Sentinel/
       pages/             login, Dashboard, serviços e usuários
   infra/nginx/           configuração do proxy reverso
   infra/prometheus/      configuração de coleta de métricas
+  infra/grafana/         datasource e dashboards provisionados
   docker-compose.yml
 ```
 
@@ -69,8 +70,10 @@ Infra:
 - Docker Compose
 - Nginx
 - Prometheus
+- Grafana
 - Volume persistente para PostgreSQL
 - Volume persistente para Prometheus
+- Volume persistente para Grafana
 
 ## Execução com Docker
 
@@ -86,6 +89,7 @@ Acesse:
 - Métricas do backend: http://localhost/metrics
 - API via Nginx: http://localhost/api
 - Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
 
 O container do backend executa `alembic upgrade head` automaticamente antes de iniciar a API.
 
@@ -141,6 +145,8 @@ Ao executar fora do Docker, configure `DATABASE_URL` apontando para uma instânc
 | `INITIAL_ADMIN_EMAIL` | Email do administrador inicial |
 | `INITIAL_ADMIN_PASSWORD` | Senha do administrador inicial |
 | `NGINX_PORT` | Porta exposta pelo Nginx no host |
+| `GRAFANA_ADMIN_USER` | Usuário administrador do Grafana |
+| `GRAFANA_ADMIN_PASSWORD` | Senha do administrador do Grafana |
 
 ## Principais endpoints
 
@@ -240,6 +246,65 @@ sum by (status) (rate(http_requests_total[5m]))
 
 Taxa de requests agrupada por status code.
 
+## Grafana
+
+O Grafana está disponível em http://localhost:3000.
+
+Credenciais padrão de desenvolvimento:
+
+```text
+User: admin
+Password: admin
+```
+
+O datasource `Sentinel Prometheus` é provisionado automaticamente em `infra/grafana/provisioning/datasources/prometheus.yml` e aponta para:
+
+```text
+http://prometheus:9090
+```
+
+O dashboard `Sentinel Overview` é provisionado automaticamente em `infra/grafana/dashboards/sentinel-overview.json`, dentro da pasta `Sentinel`.
+
+O dashboard inicial mostra:
+
+- Status do backend via `up{job="sentinel-backend"}`.
+- Requests por rota.
+- Requests por status code.
+- Latência média por rota.
+- Latência P95 por rota.
+- Uso de CPU do processo.
+- Memória residente do processo.
+
+Queries principais usadas no dashboard:
+
+```promql
+up{job="sentinel-backend"}
+```
+
+```promql
+sum by (handler, method) (rate(http_requests_total{job="sentinel-backend"}[5m]))
+```
+
+```promql
+sum by (status) (rate(http_requests_total{job="sentinel-backend"}[5m]))
+```
+
+```promql
+sum by (handler) (rate(http_request_duration_seconds_sum{job="sentinel-backend"}[5m])) / sum by (handler) (rate(http_request_duration_seconds_count{job="sentinel-backend"}[5m]))
+```
+
+```promql
+histogram_quantile(0.95, sum by (le, handler) (rate(http_request_duration_seconds_bucket{job="sentinel-backend"}[5m])))
+```
+
+```promql
+rate(process_cpu_seconds_total{job="sentinel-backend"}[5m])
+```
+
+```promql
+process_resident_memory_bytes{job="sentinel-backend"}
+```
+
 ## Comandos Docker
 
 ```bash
@@ -247,6 +312,7 @@ docker compose config
 docker compose up -d --build
 docker compose logs -f backend
 docker compose logs -f prometheus
+docker compose logs -f grafana
 docker compose ps
 docker compose down
 docker compose down -v
@@ -271,6 +337,7 @@ Implementado:
 - Docker Compose com PostgreSQL persistente.
 - Métricas FastAPI em `/metrics`.
 - Prometheus com scrape do backend e volume persistente.
+- Grafana com datasource Prometheus e dashboard Sentinel provisionados.
 
 Limitações atuais:
 
@@ -284,7 +351,6 @@ Limitações atuais:
 
 Fase 2 de observabilidade:
 
-- Adicionar Grafana com datasource e dashboards provisionados.
 - Adicionar Loki para armazenamento de logs.
 - Adicionar Promtail para coletar logs dos containers.
 - Adicionar cAdvisor para métricas de containers.
