@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import api_router
@@ -34,6 +35,12 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.PROJECT_NAME, version="0.1.0", lifespan=lifespan)
+    Instrumentator(
+        should_group_status_codes=False,
+        should_ignore_untemplated=True,
+        should_respect_env_var=False,
+        excluded_handlers=["/metrics"],
+    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
     app.add_middleware(
         CORSMiddleware,

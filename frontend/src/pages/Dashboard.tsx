@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, Gauge, RadioTower, Server, ShieldAlert, TimerReset, Wifi } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, Gauge, RadioTower, Server, ShieldAlert, TimerReset, Wifi } from "lucide-react";
 
 import type { PageProps } from "../App";
 import { apiRequest } from "../api/client";
@@ -77,6 +77,17 @@ export function Dashboard({ navigate }: PageProps) {
             <StatCard title="Falhas em 24h" value={data.failures_last_24h} helper="verificações offline" icon={RadioTower} tone={data.failures_last_24h ? "bad" : "good"} />
             <StatCard title="Resposta média" value={formatMs(data.average_response_time_ms)} helper="Histórico geral" icon={Gauge} />
             <StatCard title="Uptime geral" value={formatPercent(data.overall_uptime_percent)} helper="online + degradado" icon={Activity} tone="good" />
+            <StatCard
+              title="Prometheus"
+              value={
+                <a className="stat-link" href="http://localhost:9090" target="_blank" rel="noreferrer">
+                  Ativo
+                </a>
+              }
+              helper="Métricas HTTP em /metrics"
+              icon={BarChart3}
+              tone="good"
+            />
           </section>
 
           <section className="dashboard-grid">

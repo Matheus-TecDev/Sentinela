@@ -37,6 +37,7 @@ Sentinel/
       components/        layout, cards, badges e estados
       pages/             login, Dashboard, serviços e usuários
   infra/nginx/           configuração do proxy reverso
+  infra/prometheus/      configuração de coleta de métricas
   docker-compose.yml
 ```
 
@@ -67,7 +68,9 @@ Infra:
 - Docker
 - Docker Compose
 - Nginx
+- Prometheus
 - Volume persistente para PostgreSQL
+- Volume persistente para Prometheus
 
 ## Execução com Docker
 
@@ -80,7 +83,9 @@ Acesse:
 
 - Frontend: http://localhost
 - Health do backend: http://localhost/health
+- Métricas do backend: http://localhost/metrics
 - API via Nginx: http://localhost/api
+- Prometheus: http://localhost:9090
 
 O container do backend executa `alembic upgrade head` automaticamente antes de iniciar a API.
 
@@ -170,6 +175,10 @@ Health:
 
 - `GET /health`
 
+Metrics:
+
+- `GET /metrics`
+
 ## RBAC
 
 - `ADMIN`: gerencia usuários e serviços, além de visualizar Dashboard e detalhes.
@@ -187,12 +196,57 @@ O worker do backend verifica serviços ativos em um intervalo configurável:
 
 Cada verificação é persistida com id do serviço, status, código HTTP, tempo de resposta, mensagem de erro e data da execução.
 
+## Métricas e Prometheus
+
+O backend expõe métricas HTTP no endpoint `/metrics` usando `prometheus-fastapi-instrumentator`.
+
+O Prometheus está configurado em `infra/prometheus/prometheus.yml` para coletar métricas do target interno `backend:8000/metrics`.
+
+Acesse:
+
+- Prometheus: http://localhost:9090
+- Targets: http://localhost:9090/targets
+- Métricas diretas do backend via Nginx: http://localhost/metrics
+
+Para verificar se a coleta está ativa:
+
+1. Abra http://localhost:9090/targets.
+2. Confirme que o job `sentinel-backend` está com estado `UP`.
+3. Gere tráfego acessando o frontend ou chamando endpoints da API.
+
+Queries básicas no Prometheus:
+
+```promql
+http_requests_total
+```
+
+Total de requests HTTP coletadas pelo FastAPI.
+
+```promql
+sum by (handler, method, status) (rate(http_requests_total[5m]))
+```
+
+Taxa de requests por rota, método e status code.
+
+```promql
+histogram_quantile(0.95, sum by (le, handler) (rate(http_request_duration_seconds_bucket[5m])))
+```
+
+Latência p95 por rota.
+
+```promql
+sum by (status) (rate(http_requests_total[5m]))
+```
+
+Taxa de requests agrupada por status code.
+
 ## Comandos Docker
 
 ```bash
 docker compose config
 docker compose up -d --build
 docker compose logs -f backend
+docker compose logs -f prometheus
 docker compose ps
 docker compose down
 docker compose down -v
@@ -215,10 +269,11 @@ Implementado:
 - Administração de usuários.
 - Nginx como proxy reverso.
 - Docker Compose com PostgreSQL persistente.
+- Métricas FastAPI em `/metrics`.
+- Prometheus com scrape do backend e volume persistente.
 
 Limitações atuais:
 
-- Ainda não há endpoint real de métricas.
 - Ainda não há tracing distribuído.
 - Ainda não há pipeline de agregação de logs.
 - Ainda não há fluxo de redefinição de senha.
@@ -229,8 +284,6 @@ Limitações atuais:
 
 Fase 2 de observabilidade:
 
-- Expor `/metrics` no backend usando Prometheus client.
-- Adicionar Prometheus ao Docker Compose.
 - Adicionar Grafana com datasource e dashboards provisionados.
 - Adicionar Loki para armazenamento de logs.
 - Adicionar Promtail para coletar logs dos containers.

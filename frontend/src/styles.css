@@ -370,6 +370,15 @@ tbody span,
   color: var(--red);
 }
 
+.stat-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.stat-link:hover {
+  text-decoration: underline;
+}
+
 .panel {
   padding: 18px;
 }
