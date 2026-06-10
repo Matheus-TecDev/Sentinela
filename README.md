@@ -75,6 +75,8 @@ Infra:
 - Grafana
 - Loki
 - Promtail
+- cAdvisor
+- Node Exporter
 - Volume persistente para PostgreSQL
 - Volume persistente para Prometheus
 - Volume persistente para Grafana
@@ -211,7 +213,11 @@ Cada verificação é persistida com id do serviço, status, código HTTP, tempo
 
 O backend expõe métricas HTTP no endpoint `/metrics` usando `prometheus-fastapi-instrumentator`.
 
-O Prometheus está configurado em `infra/prometheus/prometheus.yml` para coletar métricas do target interno `backend:8000/metrics`.
+O Prometheus está configurado em `infra/prometheus/prometheus.yml` para coletar métricas dos targets internos:
+
+- `sentinel-backend`: métricas HTTP e de processo do FastAPI em `backend:8000/metrics`.
+- `cadvisor`: métricas de containers Docker em `cadvisor:8080/metrics`.
+- `node-exporter`: métricas do host em `node-exporter:9100/metrics`.
 
 Acesse:
 
@@ -222,7 +228,7 @@ Acesse:
 Para verificar se a coleta está ativa:
 
 1. Abra http://localhost:9090/targets.
-2. Confirme que o job `sentinel-backend` está com estado `UP`.
+2. Confirme que os jobs `sentinel-backend`, `cadvisor` e `node-exporter` estão com estado `UP`.
 3. Gere tráfego acessando o frontend ou chamando endpoints da API.
 
 Queries básicas no Prometheus:
@@ -234,10 +240,16 @@ http_requests_total
 Total de requests HTTP coletadas pelo FastAPI.
 
 ```promql
-sum by (handler, method, status) (rate(http_requests_total[5m]))
+sum by (handler, method, status) (increase(http_requests_total{job="sentinel-backend"}[5m]))
 ```
 
-Taxa de requests por rota, método e status code.
+Contagem real de requests por rota, método e status code nos últimos 5 minutos.
+
+```promql
+sum by (handler, method) (rate(http_requests_total{job="sentinel-backend"}[5m]))
+```
+
+Throughput de requests por segundo. Use `rate()` quando o painel ou consulta tiver semântica de taxa.
 
 ```promql
 histogram_quantile(0.95, sum by (le, handler) (rate(http_request_duration_seconds_bucket[5m])))
@@ -250,6 +262,30 @@ sum by (status) (rate(http_requests_total[5m]))
 ```
 
 Taxa de requests agrupada por status code.
+
+```promql
+topk(10, sum by (handler) (increase(http_requests_total{job="sentinel-backend"}[1h])))
+```
+
+Top rotas mais acessadas na última hora.
+
+```promql
+sum by (status) (increase(http_requests_total{job="sentinel-backend", status!~"2.."}[1h]))
+```
+
+Erros HTTP agrupados por status na última hora.
+
+```promql
+100 * (1 - avg(rate(node_cpu_seconds_total{job="node-exporter", mode="idle"}[5m])))
+```
+
+Uso de CPU do host.
+
+```promql
+sum by (id) (rate(container_cpu_usage_seconds_total{job="cadvisor"}[5m]))
+```
+
+Uso de CPU por container/escopo exposto pelo cAdvisor. Em Linux nativo, labels adicionais do Docker Compose podem aparecer e permitir agrupamentos por serviço.
 
 ## Grafana
 
@@ -273,12 +309,18 @@ O dashboard `Sentinel Overview` é provisionado automaticamente em `infra/grafan
 O dashboard inicial mostra:
 
 - Status do backend via `up{job="sentinel-backend"}`.
-- Requests por rota.
-- Requests por status code.
+- Requests por quantidade usando `increase()` em janelas de 5, 15 e 60 minutos.
+- Throughput por rota e status usando `rate()` com títulos em `req/s`.
+- Top rotas mais acessadas.
+- Top status HTTP.
+- Erros HTTP por status.
+- Top endpoints com erro.
 - Latência média por rota.
 - Latência P95 por rota.
 - Uso de CPU do processo.
 - Memória residente do processo.
+- CPU, memória, filesystem, rede e load average do host.
+- CPU, memória, rede, filesystem e contagem de containers ativos.
 - Volume de logs por serviço.
 - Logs recentes do backend.
 
@@ -289,11 +331,27 @@ up{job="sentinel-backend"}
 ```
 
 ```promql
+sum(increase(http_requests_total{job="sentinel-backend"}[5m]))
+```
+
+```promql
+sum(increase(http_requests_total{job="sentinel-backend"}[15m]))
+```
+
+```promql
+sum(increase(http_requests_total{job="sentinel-backend"}[1h]))
+```
+
+```promql
 sum by (handler, method) (rate(http_requests_total{job="sentinel-backend"}[5m]))
 ```
 
 ```promql
-sum by (status) (rate(http_requests_total{job="sentinel-backend"}[5m]))
+topk(10, sum by (handler) (increase(http_requests_total{job="sentinel-backend"}[1h])))
+```
+
+```promql
+sum by (status) (increase(http_requests_total{job="sentinel-backend", status!~"2.."}[1h]))
 ```
 
 ```promql
@@ -311,6 +369,37 @@ rate(process_cpu_seconds_total{job="sentinel-backend"}[5m])
 ```promql
 process_resident_memory_bytes{job="sentinel-backend"}
 ```
+
+```promql
+100 * (1 - (node_memory_MemAvailable_bytes{job="node-exporter"} / node_memory_MemTotal_bytes{job="node-exporter"}))
+```
+
+```promql
+sum by (id) (container_memory_working_set_bytes{job="cadvisor"})
+```
+
+## Infraestrutura com cAdvisor e Node Exporter
+
+O cAdvisor coleta métricas dos containers Docker, incluindo CPU, memória, rede, filesystem e presença dos containers. Ele não é exposto diretamente no host; o Prometheus acessa o serviço pela rede interna em:
+
+```text
+http://cadvisor:8080/metrics
+```
+
+O Node Exporter coleta métricas do host, incluindo CPU, memória, filesystem, rede e load average. Ele também fica acessível apenas pela rede interna do Docker Compose em:
+
+```text
+http://node-exporter:9100/metrics
+```
+
+Para validar:
+
+1. Abra http://localhost:9090/targets.
+2. Confirme `cadvisor` e `node-exporter` como `UP`.
+3. No Grafana, abra o dashboard `Sentinel Overview`.
+4. Confira as seções `Infraestrutura - host` e `Infraestrutura - containers`.
+
+No Docker Desktop para Windows, algumas métricas podem representar a VM Linux usada pelo Docker Desktop, e não todos os recursos físicos do Windows diretamente. Mounts como `/`, `/sys`, `/var/lib/docker` e `/dev/disk` também podem variar conforme a versão do Docker Desktop, WSL2 e permissões do ambiente. Em alguns ambientes, o cAdvisor expõe métricas agregadas com `id="/"` em vez de labels detalhados por serviço do Docker Compose; por isso o dashboard usa `id` como fallback. Em Linux nativo, os labels por container/serviço tendem a ser mais completos. A configuração atual privilegia o melhor funcionamento local possível sem exigir instalação nativa no host.
 
 ## Logs com Loki e Promtail
 
@@ -378,6 +467,8 @@ docker compose logs -f prometheus
 docker compose logs -f grafana
 docker compose logs -f loki
 docker compose logs -f promtail
+docker compose logs -f cadvisor
+docker compose logs -f node-exporter
 docker compose ps
 docker compose down
 docker compose down -v
@@ -406,6 +497,9 @@ Implementado:
 - Loki com armazenamento persistente de logs.
 - Promtail coletando logs dos containers Docker.
 - Grafana com datasource Loki e painéis de logs no dashboard Sentinel.
+- cAdvisor coletando métricas dos containers.
+- Node Exporter coletando métricas do host.
+- Grafana com painéis de aplicação, containers e host.
 
 Limitações atuais:
 
@@ -418,9 +512,7 @@ Limitações atuais:
 
 Fase 2 de observabilidade:
 
-- Adicionar cAdvisor para métricas de containers.
-- Adicionar Node Exporter para métricas do host.
-- Criar dashboards para latência da API, taxa de erro, duração do worker, distribuição de status das verificações e uptime dos serviços.
+- Criar dashboards adicionais para duração do worker, distribuição de status das verificações e uptime dos serviços.
 - Adicionar regras de alerta para serviços offline e tempo de resposta degradado.
 
 Fase 3 de maturidade da plataforma:
