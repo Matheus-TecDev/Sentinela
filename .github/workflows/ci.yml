@@ -76,3 +76,29 @@ jobs:
 
       - name: Build frontend image
         run: docker build -t sentinel-frontend ./frontend
+
+  docker-publish:
+    name: Docker publish GHCR
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, docker, docker-build]
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Login no GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build e push backend
+        run: |
+          docker build -t ghcr.io/${{ github.repository_owner }}/sentinel-backend:latest ./backend
+          docker push ghcr.io/${{ github.repository_owner }}/sentinel-backend:latest
+
+      - name: Build e push frontend
+        run: |
+          docker build -t ghcr.io/${{ github.repository_owner }}/sentinel-frontend:latest ./frontend
+          docker push ghcr.io/${{ github.repository_owner }}/sentinel-frontend:latest
