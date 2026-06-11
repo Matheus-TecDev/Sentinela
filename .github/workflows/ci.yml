@@ -62,3 +62,17 @@ jobs:
 
       - name: Validar docker-compose
         run: docker compose config
+
+  docker-build:
+    name: Docker image build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t sentinel-backend ./backend
+
+      - name: Build frontend image
+        run: docker build -t sentinel-frontend ./frontend
