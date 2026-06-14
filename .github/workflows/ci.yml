@@ -66,7 +66,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Login no GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u matheus-tecdev --password-stdin
 
       - name: Build e push backend
         run: |
