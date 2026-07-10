@@ -1,6 +1,6 @@
-# Sentinela
+# Sentinel
 
-Sentinela is a full-stack monitoring platform for APIs, internal services, and business applications, built with FastAPI, PostgreSQL, React, Docker, and an integrated observability stack.
+Sentinel is a full-stack monitoring platform for APIs, internal services, and business applications, built with FastAPI, PostgreSQL, React, Docker, and an integrated observability stack.
 
 The platform runs scheduled HTTP checks, maintains availability history, and provides an operational view of services that are online, degraded, or unavailable.
 
