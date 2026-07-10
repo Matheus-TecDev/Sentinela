@@ -2,7 +2,7 @@
 
 ## Overview
 
-Sentinela is organized as a containerized full-stack application. Nginx is the entry point, the React frontend provides the operational interface, and the FastAPI backend handles authentication, monitoring rules, incidents, and persistence.
+Sentinel is organized as a containerized full-stack application.
 
 ```text
 Client -> Nginx -> React frontend
