@@ -1,45 +1,45 @@
-# Observabilidade
+# Observability
 
-## Métricas
+## Metrics
 
-A API usa `prometheus-fastapi-instrumentator` e expõe `/metrics`. A própria rota de métricas é excluída da instrumentação.
+The API uses `prometheus-fastapi-instrumentator` and exposes `/metrics`. The metrics route itself is excluded from instrumentation.
 
-O Prometheus coleta a cada 15 segundos:
+Prometheus scrapes every 15 seconds:
 
-| Job | Target | Finalidade |
+| Job | Target | Purpose |
 | --- | --- | --- |
-| `sentinel-backend` | `backend:8000/metrics` | Requisições, status e latência |
+| `sentinel-backend` | `backend:8000/metrics` | Requests, status, and latency |
 | `cadvisor` | `cadvisor:8080` | Containers |
 | `node-exporter` | `node-exporter:9100` | Host |
 
 ## Logs
 
-O backend configura logging na inicialização e registra eventos operacionais, incluindo:
+The backend configures logging at startup and records operational events, including:
 
-- início e encerramento da API;
-- início e encerramento do worker;
-- resultado dos health checks;
-- falhas na entrega de alertas.
+- API startup and shutdown;
+- worker startup and shutdown;
+- health-check results;
+- alert delivery failures.
 
-O Promtail descobre containers pelo socket do Docker, extrai seus logs e adiciona labels como container, serviço e projeto do Compose. Os registros são enviados ao Loki.
+Promtail discovers containers through the Docker socket, extracts their logs, and adds labels such as container, service, and Compose project. Records are sent to Loki.
 
-## Visualização
+## Visualization
 
-O Grafana utiliza datasources provisionados para consultar métricas e logs. Os volumes preservam dados do Grafana, Prometheus e Loki entre reinicializações.
+Grafana uses provisioned data sources to query metrics and logs. Volumes preserve Grafana, Prometheus, and Loki data across restarts.
 
-## Health checks
+## Health Checks
 
-- `GET /health`: confirma que o processo da API responde;
-- health checks do Docker controlam a ordem de inicialização;
-- o PostgreSQL usa `pg_isready`;
-- backend e frontend possuem verificações próprias no Compose.
+- `GET /health`: confirms that the API process is responding;
+- Docker health checks control startup order;
+- PostgreSQL uses `pg_isready`;
+- the backend and frontend define their own Compose checks.
 
-O endpoint `/health` não testa a conexão com PostgreSQL; ele indica apenas disponibilidade da API.
+The `/health` endpoint does not test the PostgreSQL connection; it indicates API availability only.
 
-## Limitações
+## Limitations
 
-- Não há tracing distribuído.
-- Não há Alertmanager na stack atual.
-- Não há SLOs ou recording rules declarados.
-- Retenção e dimensionamento são configurações locais.
-- Promtail é suficiente para o MVP, mas pode ser substituído por Grafana Alloy em uma evolução.
+- Distributed tracing is not implemented.
+- Alertmanager is not part of the current stack.
+- SLOs and recording rules are not declared.
+- Retention and sizing use local configuration.
+- Promtail is sufficient for the MVP but may be replaced with Grafana Alloy in a future iteration.
