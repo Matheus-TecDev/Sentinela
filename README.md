@@ -25,6 +25,8 @@ Equipes técnicas precisam identificar indisponibilidade e degradação antes qu
 - Verificações HTTP automáticas em intervalo configurável.
 - Classificação dos serviços como online, offline ou degradado.
 - Histórico persistente de verificações.
+- Abertura e resolução automática de incidentes.
+- Notificações por webhook e Discord com histórico de entrega.
 - Dashboard operacional.
 - Autenticação JWT e controle de acesso por perfil.
 - Métricas HTTP expostas para o Prometheus.
@@ -110,6 +112,16 @@ infra/     Nginx, Prometheus, Grafana, Loki e Promtail
 .github/   Pipeline de integração e publicação
 ```
 
+## Documentação
+
+| Documento | Conteúdo |
+| --- | --- |
+| [Arquitetura](docs/architecture.md) | Componentes, persistência, inicialização e limitações |
+| [API](docs/api.md) | Endpoints, níveis de acesso e erros |
+| [Autenticação e RBAC](docs/authentication-and-rbac.md) | JWT, senhas, perfis e permissões |
+| [Regras de monitoramento](docs/monitoring-rules.md) | Scheduler, checks, incidentes e notificações |
+| [Observabilidade](docs/observability.md) | Métricas, logs, health checks e lacunas |
+
 ## Validação
 
 ```bash
@@ -129,4 +141,4 @@ docker compose config
 
 **MVP concluído.**
 
-O primeiro escopo cobre monitoramento automático, histórico, dashboard, RBAC, métricas, logs e execução containerizada. Tracing distribuído, alertas e notificações permanecem como evoluções futuras.
+O primeiro escopo cobre monitoramento automático, incidentes, notificações por webhook e Discord, dashboard, RBAC, métricas, logs e execução containerizada. Tracing distribuído, SMTP e coordenação de múltiplas réplicas permanecem como evoluções futuras.
