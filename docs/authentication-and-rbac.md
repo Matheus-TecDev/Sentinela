@@ -1,56 +1,56 @@
-# Autenticação e RBAC
+# Authentication and RBAC
 
-## Fluxo de autenticação
+## Authentication Flow
 
-1. O cliente envia credenciais para `POST /api/auth/login`.
-2. O serviço valida o usuário e a senha.
-3. A API emite um JWT assinado com HS256.
-4. O cliente envia `Authorization: Bearer <token>`.
-5. A dependência `get_current_user` decodifica o token e carrega o usuário do banco.
-6. Usuários inexistentes ou inativos recebem `401`.
+1. The client submits credentials to `POST /api/auth/login`.
+2. The service validates the user and password.
+3. The API issues an HS256-signed JWT.
+4. The client sends `Authorization: Bearer <token>`.
+5. The `get_current_user` dependency decodes the token and loads the user from the database.
+6. Missing or inactive users receive `401`.
 
-O token contém:
+The token contains:
 
-- `sub`: ID do usuário;
-- `role`: perfil no momento da emissão;
-- `exp`: expiração.
+- `sub`: user ID;
+- `role`: role at issuance time;
+- `exp`: expiration.
 
-A autorização efetiva utiliza o usuário carregado do banco, evitando depender apenas do perfil presente no token.
+Effective authorization uses the user loaded from the database instead of relying only on the role embedded in the token.
 
-## Senhas
+## Passwords
 
-As senhas são armazenadas com PBKDF2-HMAC-SHA256, salt aleatório de 16 bytes e 260.000 iterações. A comparação utiliza `hmac.compare_digest`.
+Passwords are stored with PBKDF2-HMAC-SHA256, a random 16-byte salt, and 260,000 iterations. Comparisons use `hmac.compare_digest`.
 
-## Perfis
+## Roles
 
-| Operação | ADMIN | OPERATOR | VIEWER |
+| Operation | ADMIN | OPERATOR | VIEWER |
 | --- | :---: | :---: | :---: |
-| Consultar dashboard | Sim | Sim | Sim |
-| Consultar serviços, checks e incidentes | Sim | Sim | Sim |
-| Criar ou alterar serviços | Sim | Sim | Não |
-| Configurar canais de alerta | Sim | Sim | Não |
-| Gerenciar usuários | Sim | Não | Não |
+| View dashboard | Yes | Yes | Yes |
+| View services, checks, and incidents | Yes | Yes | Yes |
+| Create or update services | Yes | Yes | No |
+| Configure alert channels | Yes | Yes | No |
+| Manage users | Yes | No | No |
 
-As dependências reutilizáveis são:
+Reusable authorization dependencies:
 
-- `viewer_access`: todos os perfis;
-- `operator_access`: `ADMIN` e `OPERATOR`;
-- `admin_access`: somente `ADMIN`.
+- `viewer_access`: all roles;
+- `operator_access`: `ADMIN` and `OPERATOR`;
+- `admin_access`: `ADMIN` only.
 
-## Configuração
+## Configuration
 
-Variáveis relevantes:
+Relevant environment variables:
 
 - `JWT_SECRET_KEY`;
-- `JWT_ALGORITHM`, padrão `HS256`;
+- `JWT_ALGORITHM`, default `HS256`;
 - `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`;
-- credenciais do administrador inicial.
+- initial administrator credentials.
 
-Segredos e credenciais padrão são destinados apenas ao desenvolvimento e devem ser substituídos fora do ambiente local.
+Default secrets and credentials are intended for development only and must be replaced outside the local environment.
 
-## Limitações atuais
+## Current Limitations
 
-- Não há refresh token.
-- Não há revogação individual de tokens.
-- Não há MFA.
-- A segurança de transporte depende de TLS no ambiente de implantação.
+- Refresh tokens are not implemented.
+- Tokens cannot be individually revoked.
+- MFA is not implemented.
+- Transport security depends on TLS in the deployment environment.

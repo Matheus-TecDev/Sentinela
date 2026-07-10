@@ -1,71 +1,71 @@
 # API
 
-A API usa o prefixo `/api`. Com exceção do login e do health check, as rotas exigem token Bearer válido.
+The API uses the `/api` prefix. Except for login and the health endpoint, routes require a valid Bearer token.
 
-## Autenticação
+## Authentication
 
-| Método | Endpoint | Acesso | Descrição |
+| Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |
-| POST | `/api/auth/login` | Público | Autentica e retorna JWT |
-| GET | `/api/auth/me` | Autenticado | Retorna o usuário atual |
+| POST | `/api/auth/login` | Public | Authenticates and returns a JWT |
+| GET | `/api/auth/me` | Authenticated | Returns the current user |
 
-## Usuários
+## Users
 
-Todas as operações são exclusivas de `ADMIN`.
+All operations require `ADMIN`.
 
-| Método | Endpoint | Descrição |
+| Method | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/api/users` | Lista usuários |
-| POST | `/api/users` | Cria usuário |
-| PUT | `/api/users/{user_id}` | Atualiza usuário |
-| PATCH | `/api/users/{user_id}/activation` | Ativa ou desativa usuário |
+| GET | `/api/users` | Lists users |
+| POST | `/api/users` | Creates a user |
+| PUT | `/api/users/{user_id}` | Updates a user |
+| PATCH | `/api/users/{user_id}/activation` | Activates or deactivates a user |
 
-## Serviços e checks
+## Services and Checks
 
-Leitura exige `VIEWER`, `OPERATOR` ou `ADMIN`. Criação e alteração exigem `OPERATOR` ou `ADMIN`.
+Read operations require `VIEWER`, `OPERATOR`, or `ADMIN`. Creation and updates require `OPERATOR` or `ADMIN`.
 
-| Método | Endpoint | Descrição |
+| Method | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/api/services` | Lista e filtra serviços |
-| POST | `/api/services` | Cadastra serviço |
-| GET | `/api/services/{service_id}` | Retorna detalhes |
-| PUT | `/api/services/{service_id}` | Atualiza serviço |
-| PATCH | `/api/services/{service_id}/activation` | Altera ativação |
-| GET | `/api/services/checks/history` | Histórico global |
-| GET | `/api/services/checks/failures` | Falhas recentes |
-| GET | `/api/services/{service_id}/checks` | Checks do serviço |
-| GET | `/api/services/{service_id}/metrics` | Métricas por período |
-| GET | `/api/services/{service_id}/incidents` | Incidentes do serviço |
+| GET | `/api/services` | Lists and filters services |
+| POST | `/api/services` | Registers a service |
+| GET | `/api/services/{service_id}` | Returns service details |
+| PUT | `/api/services/{service_id}` | Updates a service |
+| PATCH | `/api/services/{service_id}/activation` | Changes activation state |
+| GET | `/api/services/checks/history` | Returns global check history |
+| GET | `/api/services/checks/failures` | Returns recent failures |
+| GET | `/api/services/{service_id}/checks` | Returns service checks |
+| GET | `/api/services/{service_id}/metrics` | Returns metrics for a time range |
+| GET | `/api/services/{service_id}/incidents` | Returns service incidents |
 
-A listagem aceita filtros por texto, ambiente, status e ativação. Os históricos possuem limites entre 1 e 500 registros.
+Service lists support text, environment, status, and activation filters. History endpoints accept limits from 1 through 500 records.
 
-## Alertas e notificações
+## Alerts and Notifications
 
-| Método | Endpoint | Acesso | Descrição |
+| Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |
-| GET | `/api/services/{service_id}/alerts` | Leitura | Lista canais |
-| POST | `/api/services/{service_id}/alerts` | Operação | Cria canal |
-| PUT | `/api/services/{service_id}/alerts/{alert_id}` | Operação | Atualiza canal |
-| PATCH | `/api/services/{service_id}/alerts/{alert_id}/activation` | Operação | Altera ativação |
-| GET | `/api/services/{service_id}/notifications` | Leitura | Lista tentativas de entrega |
+| GET | `/api/services/{service_id}/alerts` | Read | Lists channels |
+| POST | `/api/services/{service_id}/alerts` | Operate | Creates a channel |
+| PUT | `/api/services/{service_id}/alerts/{alert_id}` | Operate | Updates a channel |
+| PATCH | `/api/services/{service_id}/alerts/{alert_id}/activation` | Operate | Changes activation state |
+| GET | `/api/services/{service_id}/notifications` | Read | Lists delivery attempts |
 
-Os tipos modelados são `webhook`, `discord` e `email`. Nesta versão, webhook e Discord são enviados; e-mail registra falha informando que SMTP ainda não foi implementado.
+Modeled channel types are `webhook`, `discord`, and `email`. This version sends webhook and Discord notifications; email attempts are logged as failed because SMTP has not been implemented.
 
-## Dashboard e operação
+## Dashboard and Operations
 
-| Método | Endpoint | Acesso | Descrição |
+| Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |
-| GET | `/api/dashboard` | Autenticado | Resumo operacional |
-| GET | `/health` | Público | Saúde da API |
-| GET | `/metrics` | Infraestrutura | Métricas Prometheus |
+| GET | `/api/dashboard` | Authenticated | Returns an operational summary |
+| GET | `/health` | Public | Checks API health |
+| GET | `/metrics` | Infrastructure | Exposes Prometheus metrics |
 
-Rotas adicionais de incidentes e responsáveis são registradas nos respectivos módulos da API.
+Additional incident and owner routes are registered in their respective API modules.
 
-## Erros
+## Errors
 
-- `401`: token ausente, inválido, expirado ou usuário inativo;
-- `403`: perfil sem permissão;
-- `404`: recurso inexistente;
-- `422`: contrato de entrada inválido.
+- `401`: missing, invalid, or expired token, or inactive user;
+- `403`: insufficient role;
+- `404`: resource not found;
+- `422`: invalid input contract.
 
-A aplicação registra handlers próprios para erros HTTP e de validação.
+The application registers custom handlers for HTTP and validation errors.
