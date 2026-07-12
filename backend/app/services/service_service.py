@@ -1,3 +1,6 @@
+from collections.abc import Callable
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -9,6 +12,11 @@ from app.repositories.health_check_repository import HealthCheckRepository
 from app.repositories.responsible_repository import ResponsibleRepository
 from app.repositories.service_repository import ServiceRepository
 from app.schemas.service import ServiceCreate, ServiceDetail, ServicePeriodMetrics, ServiceUpdate, ServiceWithStatus
+from app.services.incident_service import IncidentService
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def serialize_service_with_status(
@@ -29,10 +37,12 @@ def serialize_service_with_status(
 
 
 class ServiceService:
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], datetime] = utc_now) -> None:
+        self.clock = clock
         self.services = ServiceRepository()
         self.checks = HealthCheckRepository()
         self.responsibles = ResponsibleRepository()
+        self.incidents = IncidentService()
 
     def list(
         self,
@@ -87,15 +97,21 @@ class ServiceService:
 
     def update(self, db: Session, service_id: int, payload: ServiceUpdate) -> ServiceWithStatus:
         service = self._get_or_404(db, service_id)
+        was_active = service.is_active
         data = payload.model_dump(exclude_unset=True)
         data = self._normalize_responsible(db, data, current_owner=service.owner)
         service = self.services.update(db, service, data)
+        if was_active and service.is_active is False:
+            self.incidents.resolve_open_incident(db, service.id, self.clock())
         latest = self.checks.latest_by_service(db).get(service.id)
         return serialize_service_with_status(service, latest)
 
     def set_active(self, db: Session, service_id: int, is_active: bool) -> ServiceWithStatus:
         service = self._get_or_404(db, service_id)
+        was_active = service.is_active
         service = self.services.update(db, service, {"is_active": is_active})
+        if was_active and service.is_active is False:
+            self.incidents.resolve_open_incident(db, service.id, self.clock())
         latest = self.checks.latest_by_service(db).get(service.id)
         return serialize_service_with_status(service, latest)
 

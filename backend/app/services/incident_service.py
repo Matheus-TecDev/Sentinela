@@ -70,15 +70,34 @@ class IncidentService:
             return IncidentTransition(incident=incident, event_type=NotificationEventType.INCIDENT_OPENED)
 
         if check.status == HealthStatus.ONLINE and open_incident:
-            incident = self.incidents.update(
-                db,
-                open_incident,
-                {
-                    "status": IncidentStatus.RESOLVED,
-                    "resolved_at": check.checked_at,
-                    "duration_seconds": duration_seconds(open_incident.started_at, check.checked_at),
-                },
-            )
-            return IncidentTransition(incident=incident, event_type=NotificationEventType.INCIDENT_RESOLVED)
+            return self._resolve_incident(db, open_incident, check.checked_at)
 
         return None
+
+    def resolve_open_incident(
+        self,
+        db: Session,
+        service_id: int,
+        resolved_at: datetime,
+    ) -> IncidentTransition | None:
+        open_incident = self.incidents.open_for_service(db, service_id)
+        if open_incident is None:
+            return None
+        return self._resolve_incident(db, open_incident, resolved_at)
+
+    def _resolve_incident(
+        self,
+        db: Session,
+        open_incident: Incident,
+        resolved_at: datetime,
+    ) -> IncidentTransition:
+        incident = self.incidents.update(
+            db,
+            open_incident,
+            {
+                "status": IncidentStatus.RESOLVED,
+                "resolved_at": resolved_at,
+                "duration_seconds": duration_seconds(open_incident.started_at, resolved_at),
+            },
+        )
+        return IncidentTransition(incident=incident, event_type=NotificationEventType.INCIDENT_RESOLVED)
