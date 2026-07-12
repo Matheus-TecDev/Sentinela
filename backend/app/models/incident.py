@@ -1,4 +1,4 @@
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.enums import IncidentStatus
@@ -7,6 +7,14 @@ from app.db.base import Base
 
 class Incident(Base):
     __tablename__ = "incidents"
+    __table_args__ = (
+        Index(
+            "uq_incidents_service_id_open",
+            "service_id",
+            unique=True,
+            postgresql_where=text("status = 'open'"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     service_id: Mapped[int] = mapped_column(

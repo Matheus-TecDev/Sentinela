@@ -3,18 +3,35 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.enums import IncidentStatus
 from app.models.incident import Incident
 from app.models.service import MonitoredService
 
+OPEN_INCIDENT_UNIQUE_INDEX = "uq_incidents_service_id_open"
+
+
+def is_open_incident_unique_violation(error: IntegrityError) -> bool:
+    diagnostic = getattr(error.orig, "diag", None)
+    return getattr(diagnostic, "constraint_name", None) == OPEN_INCIDENT_UNIQUE_INDEX
+
 
 class IncidentRepository:
     def create(self, db: Session, data: dict) -> Incident:
         incident = Incident(**data)
         db.add(incident)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError as error:
+            db.rollback()
+            if not is_open_incident_unique_violation(error):
+                raise
+            competing_incident = self.open_for_service(db, data["service_id"])
+            if competing_incident is None:
+                raise
+            return competing_incident
         db.refresh(incident)
         return incident
 

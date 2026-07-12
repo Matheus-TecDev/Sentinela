@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.core.enums import HealthStatus, IncidentStatus, NotificationEventType
 from app.models.health_check import HealthCheckResult
 from app.models.incident import Incident
+from app.repositories.incident_repository import IncidentRepository
 from app.services.incident_service import IncidentService
 
 
@@ -33,6 +35,31 @@ class FakeIncidentRepository:
         return incident
 
 
+class ConstraintDiagnostic:
+    def __init__(self, constraint_name: str) -> None:
+        self.constraint_name = constraint_name
+
+
+class DatabaseError(Exception):
+    def __init__(self, constraint_name: str) -> None:
+        self.diag = ConstraintDiagnostic(constraint_name)
+
+
+class FailingCommitSession:
+    def __init__(self, error: IntegrityError) -> None:
+        self.error = error
+        self.rollback_calls = 0
+
+    def add(self, _incident: Incident) -> None:
+        pass
+
+    def commit(self) -> None:
+        raise self.error
+
+    def rollback(self) -> None:
+        self.rollback_calls += 1
+
+
 @pytest.fixture
 def incident_service() -> tuple[IncidentService, FakeIncidentRepository]:
     service = IncidentService()
@@ -51,6 +78,14 @@ def make_check(
         status=status,
         checked_at=checked_at,
         error_message=error_message,
+    )
+
+
+def make_integrity_error(constraint_name: str) -> IntegrityError:
+    return IntegrityError(
+        "insert into incidents",
+        {},
+        DatabaseError(constraint_name),
     )
 
 
@@ -143,3 +178,41 @@ def test_online_result_without_open_incident_produces_no_transition(incident_ser
 
     assert transition is None
     assert repository.items == []
+
+
+def test_create_returns_competing_open_incident_after_unique_constraint_race(monkeypatch) -> None:
+    repository = IncidentRepository()
+    session = FailingCommitSession(make_integrity_error("uq_incidents_service_id_open"))
+    competing_incident = Incident(id=42, service_id=1, status=IncidentStatus.OPEN, reason="Serviço offline")
+    monkeypatch.setattr(repository, "open_for_service", lambda _db, _service_id: competing_incident)
+
+    incident = repository.create(
+        session,
+        {
+            "service_id": 1,
+            "status": IncidentStatus.OPEN,
+            "reason": "Serviço offline",
+        },
+    )
+
+    assert incident is competing_incident
+    assert session.rollback_calls == 1
+
+
+def test_create_reraises_unrelated_integrity_error() -> None:
+    repository = IncidentRepository()
+    error = make_integrity_error("incidents_service_id_fkey")
+    session = FailingCommitSession(error)
+
+    with pytest.raises(IntegrityError) as raised:
+        repository.create(
+            session,
+            {
+                "service_id": 999,
+                "status": IncidentStatus.OPEN,
+                "reason": "Serviço offline",
+            },
+        )
+
+    assert raised.value is error
+    assert session.rollback_calls == 1
