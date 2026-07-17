@@ -14,6 +14,9 @@ jobs:
   backend:
     name: Backend check
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
 
     steps:
       - name: Baixar código
@@ -25,17 +28,14 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependências do backend
-        working-directory: backend
         run: |
           pip install --upgrade pip
           pip install -r requirements-test.txt
 
       - name: Run backend tests
-        working-directory: backend
-        run: pytest
+        run: python -m pytest
 
       - name: Validar importação da aplicação
-        working-directory: backend
         run: |
           python -c "from app.main import app; print('Backend OK')"
 
