@@ -57,7 +57,7 @@ class IncidentService:
             )
             if unhealthy_count < self.settings.INCIDENT_FAILURE_THRESHOLD:
                 return None
-            incident = self.incidents.create_in_transaction(
+            creation = self.incidents.create_in_transaction(
                 db,
                 {
                     "service_id": check.service_id,
@@ -67,7 +67,12 @@ class IncidentService:
                     "last_error_message": error_message,
                 },
             )
-            return IncidentTransition(incident=incident, event_type=NotificationEventType.INCIDENT_OPENED)
+            if not creation.created:
+                return None
+            return IncidentTransition(
+                incident=creation.incident,
+                event_type=NotificationEventType.INCIDENT_OPENED,
+            )
 
         if check.status == HealthStatus.ONLINE and open_incident:
             return self._resolve_incident_in_transaction(db, open_incident, check.checked_at)

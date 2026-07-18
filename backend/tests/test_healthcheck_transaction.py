@@ -4,12 +4,13 @@ from datetime import datetime, timezone
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import Settings
 from app.core.enums import HealthStatus, IncidentStatus, NotificationEventType
 from app.models.health_check import HealthCheckResult
 from app.models.incident import Incident
 from app.repositories.health_check_repository import HealthCheckRepository
-from app.repositories.incident_repository import IncidentRepository
-from app.services.incident_service import IncidentTransition
+from app.repositories.incident_repository import IncidentCreationResult, IncidentRepository
+from app.services.incident_service import IncidentService, IncidentTransition
 from app.workers.healthcheck_worker import persist_check_and_sync_incident
 
 CHECKED_AT = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
@@ -309,7 +310,7 @@ class FakeSavepoint:
 
 
 class FakeSavepointSession(FakeSession):
-    def __init__(self, flush_error: IntegrityError) -> None:
+    def __init__(self, flush_error: IntegrityError | None = None) -> None:
         super().__init__()
         self.flush_error = flush_error
         self.begin_nested_calls = 0
@@ -324,13 +325,14 @@ class FakeSavepointSession(FakeSession):
 
     def flush(self) -> None:
         self.flush_calls += 1
-        raise self.flush_error
+        if self.flush_error is not None:
+            raise self.flush_error
 
     def refresh(self, _item: object) -> None:
         pass
 
 
-class RaceIncidentRepository(IncidentRepository):
+class CompetingIncidentRepository(IncidentRepository):
     def __init__(self, competing_incident: Incident) -> None:
         self.competing_incident = competing_incident
 
@@ -338,28 +340,82 @@ class RaceIncidentRepository(IncidentRepository):
         return self.competing_incident
 
 
-class RaceIncidentService:
-    def __init__(self, repository: IncidentRepository) -> None:
-        self.repository = repository
+class NoOpenIncidentRepository(IncidentRepository):
+    def open_for_service(self, _db, _service_id: int) -> None:
+        return None
 
-    def sync_from_check(
+
+class SequentialRaceIncidentRepository(CompetingIncidentRepository):
+    def __init__(self, competing_incident: Incident) -> None:
+        super().__init__(competing_incident)
+        self.open_calls = 0
+
+    def open_for_service(self, _db, _service_id: int) -> Incident | None:
+        self.open_calls += 1
+        return None if self.open_calls == 1 else self.competing_incident
+
+
+class ThresholdHealthCheckRepository:
+    def consecutive_unhealthy_count(
         self,
-        db: FakeSavepointSession,
-        check: HealthCheckResult,
-    ) -> IncidentTransition:
-        incident = self.repository.create_in_transaction(
-            db,
-            {
-                "service_id": check.service_id,
-                "status": IncidentStatus.OPEN,
-                "started_at": check.checked_at,
-                "reason": "Serviço offline",
-            },
-        )
-        return IncidentTransition(incident, NotificationEventType.INCIDENT_OPENED)
+        _db,
+        service_id: int,
+        limit: int,
+    ) -> int:
+        del service_id
+        return limit
 
 
-def test_expected_open_incident_race_preserves_health_check() -> None:
+def make_incident_service(repository: IncidentRepository) -> IncidentService:
+    service = IncidentService(Settings(INCIDENT_FAILURE_THRESHOLD=1, _env_file=None))
+    service.incidents = repository
+    service.checks = ThresholdHealthCheckRepository()
+    return service
+
+
+def test_normal_incident_creation_result_is_explicitly_created() -> None:
+    db = FakeSavepointSession()
+
+    result = IncidentRepository().create_in_transaction(
+        db,
+        {
+            "service_id": 1,
+            "status": IncidentStatus.OPEN,
+            "started_at": CHECKED_AT,
+            "reason": "Serviço offline",
+        },
+    )
+
+    assert isinstance(result, IncidentCreationResult)
+    assert result.created is True
+    assert result.incident in db.pending
+
+
+def test_expected_uniqueness_race_result_is_explicitly_not_created() -> None:
+    competing = Incident(
+        id=42,
+        service_id=1,
+        status=IncidentStatus.OPEN,
+        reason="Serviço offline",
+    )
+    db = FakeSavepointSession(
+        make_integrity_error("uq_incidents_service_id_open")
+    )
+
+    result = CompetingIncidentRepository(competing).create_in_transaction(
+        db,
+        {
+            "service_id": 1,
+            "status": IncidentStatus.OPEN,
+            "started_at": CHECKED_AT,
+            "reason": "Serviço offline",
+        },
+    )
+
+    assert result == IncidentCreationResult(incident=competing, created=False)
+
+
+def test_losing_worker_commits_health_check_without_transition_or_notification() -> None:
     error = make_integrity_error("uq_incidents_service_id_open")
     db = FakeSavepointSession(error)
     competing = Incident(
@@ -373,7 +429,7 @@ def test_expected_open_incident_race_preserves_health_check() -> None:
     _check, transition = run_workflow(
         db,
         FakeCheckRepository(),
-        RaceIncidentService(RaceIncidentRepository(competing)),
+        make_incident_service(SequentialRaceIncidentRepository(competing)),
         notifications,
     )
 
@@ -382,8 +438,39 @@ def test_expected_open_incident_race_preserves_health_check() -> None:
     assert db.savepoint_rollback_calls == 1
     assert db.commit_calls == 1
     assert db.rollback_calls == 0
-    assert transition is not None
-    assert transition.incident is competing
+    assert transition is None
+    assert notifications.calls == []
+
+
+def test_simulated_winner_and_loser_produce_exactly_one_notification() -> None:
+    notifications = FakeNotificationService()
+    winner_db = FakeSavepointSession()
+
+    _winner_check, winner_transition = run_workflow(
+        winner_db,
+        FakeCheckRepository(),
+        make_incident_service(NoOpenIncidentRepository()),
+        notifications,
+    )
+    assert winner_transition is not None
+    loser_db = FakeSavepointSession(
+        make_integrity_error("uq_incidents_service_id_open")
+    )
+    _loser_check, loser_transition = run_workflow(
+        loser_db,
+        FakeCheckRepository(),
+        make_incident_service(
+            SequentialRaceIncidentRepository(winner_transition.incident)
+        ),
+        notifications,
+    )
+
+    assert winner_transition.event_type == NotificationEventType.INCIDENT_OPENED
+    assert loser_transition is None
+    assert winner_db.commit_calls == 1
+    assert loser_db.persisted == ["check"]
+    assert loser_db.commit_calls == 1
+    assert len(notifications.calls) == 1
 
 
 def test_unrelated_integrity_error_rolls_back_and_propagates() -> None:
@@ -401,7 +488,7 @@ def test_unrelated_integrity_error_rolls_back_and_propagates() -> None:
         run_workflow(
             db,
             FakeCheckRepository(),
-            RaceIncidentService(RaceIncidentRepository(competing)),
+            make_incident_service(SequentialRaceIncidentRepository(competing)),
             notifications,
         )
 

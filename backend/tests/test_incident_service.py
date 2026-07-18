@@ -7,7 +7,7 @@ from app.core.config import Settings
 from app.core.enums import HealthStatus, IncidentStatus, NotificationEventType
 from app.models.health_check import HealthCheckResult
 from app.models.incident import Incident
-from app.repositories.incident_repository import IncidentRepository
+from app.repositories.incident_repository import IncidentCreationResult, IncidentRepository
 from app.services.incident_service import IncidentService
 
 
@@ -30,8 +30,8 @@ class FakeIncidentRepository:
         self.items.append(incident)
         return incident
 
-    def create_in_transaction(self, db: object, data: dict) -> Incident:
-        return self.create(db, data)
+    def create_in_transaction(self, db: object, data: dict) -> IncidentCreationResult:
+        return IncidentCreationResult(incident=self.create(db, data), created=True)
 
     def update(self, _db: object, incident: Incident, data: dict) -> Incident:
         for key, value in data.items():

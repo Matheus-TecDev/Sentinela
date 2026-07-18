@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import desc, func, select
@@ -11,6 +12,12 @@ from app.models.incident import Incident
 from app.models.service import MonitoredService
 
 OPEN_INCIDENT_UNIQUE_INDEX = "uq_incidents_service_id_open"
+
+
+@dataclass(frozen=True)
+class IncidentCreationResult:
+    incident: Incident
+    created: bool
 
 
 def is_open_incident_unique_violation(error: IntegrityError) -> bool:
@@ -35,7 +42,7 @@ class IncidentRepository:
         db.refresh(incident)
         return incident
 
-    def create_in_transaction(self, db: Session, data: dict) -> Incident:
+    def create_in_transaction(self, db: Session, data: dict) -> IncidentCreationResult:
         incident = Incident(**data)
         try:
             with db.begin_nested():
@@ -47,9 +54,9 @@ class IncidentRepository:
             competing_incident = self.open_for_service(db, data["service_id"])
             if competing_incident is None:
                 raise
-            return competing_incident
+            return IncidentCreationResult(incident=competing_incident, created=False)
         db.refresh(incident)
-        return incident
+        return IncidentCreationResult(incident=incident, created=True)
 
     def update(self, db: Session, incident: Incident, data: dict) -> Incident:
         for key, value in data.items():
