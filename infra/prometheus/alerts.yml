@@ -25,3 +25,11 @@ groups:
         annotations:
           summary: Sentinel has open incidents
           description: Sentinel has {{ $value }} open incidents.
+      - alert: SentinelIncidentMetricMissing
+        expr: absent(sentinel_open_incidents) and on() (up{job="sentinel-backend"} == 1)
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Sentinel incident metric is missing
+          description: The incident metric is missing while the backend is up.
