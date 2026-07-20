@@ -9,3 +9,11 @@ groups:
         annotations:
           summary: Sentinel backend is down
           description: Prometheus cannot scrape the Sentinel backend for 2 minutes.
+      - alert: SentinelServiceAvailabilityLow
+        expr: sentinel_service_availability_ratio < 0.95
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Sentinel service availability is low
+          description: Service {{ $labels.service_id }} availability has been below 95% for 5 minutes.
