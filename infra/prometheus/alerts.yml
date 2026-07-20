@@ -1,0 +1,11 @@
+groups:
+  - name: sentinel-backend
+    rules:
+      - alert: SentinelBackendDown
+        expr: up{job="sentinel-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Sentinel backend is down
+          description: Prometheus cannot scrape the Sentinel backend for 2 minutes.
