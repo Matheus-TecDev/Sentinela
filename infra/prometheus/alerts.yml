@@ -33,3 +33,11 @@ groups:
         annotations:
           summary: Sentinel incident metric is missing
           description: The incident metric is missing while the backend is up.
+      - alert: SentinelHealthCheckLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le, service_id) (rate(sentinel_health_check_duration_seconds_bucket[5m]))) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Sentinel health-check latency is high
+          description: Service {{ $labels.service_id }} p95 latency is above 2 seconds.
