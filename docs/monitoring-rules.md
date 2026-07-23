@@ -2,67 +2,75 @@
 
 ## Scheduling
 
-`AsyncIOScheduler` runs `execute_healthchecks` at the interval configured by `HEALTHCHECK_INTERVAL_SECONDS`.
+The backend creates an `AsyncIOScheduler` in UTC when `ENABLE_HEALTHCHECK_WORKER=true`. It schedules `execute_healthchecks` with:
 
-Job configuration:
+- interval: `HEALTHCHECK_INTERVAL_SECONDS`, default `60`;
+- first execution: approximately five seconds after startup;
+- `max_instances=1`, preventing overlap in the same backend process;
+- `coalesce=True`, consolidating delayed runs.
 
-- `max_instances=1`: prevents overlap within the same process;
-- `coalesce=True`: consolidates delayed executions;
-- first execution approximately five seconds after startup;
-- UTC timezone.
+Only active monitored services are selected. Services are checked sequentially.
 
-Only active services are selected.
+## Check execution and classification
 
-## Check Execution
+HTTPX performs a `GET` with redirects enabled and the timeout configured by `HEALTHCHECK_TIMEOUT_SECONDS`. A monotonic clock measures the complete execution.
 
-For each service, the worker performs a GET request with:
-
-- timeout defined by `HEALTHCHECK_TIMEOUT_SECONDS`;
-- redirects enabled;
-- total duration measured with a monotonic clock.
-
-## Classification
-
-| Condition | Result |
+| Condition | Persisted result |
 | --- | --- |
-| HTTP 200–399 within the latency threshold | `online` |
+| HTTP 200–399 at or below `DEGRADED_RESPONSE_TIME_MS` | `online` |
 | HTTP 200–399 above `DEGRADED_RESPONSE_TIME_MS` | `degraded` |
 | HTTP outside 200–399 | `offline` |
-| Timeout or HTTP/network error | `offline` |
+| Timeout or HTTP/network exception | `offline` |
 
-Each result persists the HTTP status code, latency, error, and timestamp.
+Each result stores `service_id`, status, optional HTTP status, optional response time, optional error message, and a UTC check timestamp. Failed network requests therefore become persisted `offline` results rather than disappearing from the monitoring history.
 
-## Incidents
+The outbound metrics counter and duration histogram are recorded only after classification produces a result. Metric labels contain only bounded `service_id` and status values; URLs, service names, errors, and exception text are not metric labels.
 
-After each check:
+## Incident lifecycle
 
-- `offline` and `degraded` results count as unhealthy;
-- an incident opens when consecutive unhealthy results reach `INCIDENT_FAILURE_THRESHOLD`, which defaults to `3`;
-- an `online` result resets the consecutive unhealthy sequence;
-- subsequent problematic results update the open incident;
-- an `online` result resolves the open incident and calculates its duration;
-- an `online` result without an open incident causes no transition.
+`offline` and `degraded` are unhealthy for incident threshold purposes. The global backend setting `INCIDENT_FAILURE_THRESHOLD` defaults to three. Although it is listed in `.env.example`, the current Compose service does not forward it, so the Compose deployment uses that default.
 
-`INCIDENT_FAILURE_THRESHOLD` is currently a global setting and applies to every monitored service.
+- Before the threshold, an unhealthy result persists without opening an incident.
+- At the threshold, Sentinel opens an incident if none exists.
+- Further unhealthy checks update `last_error_message` only when a concrete new error exists; the original opening reason is immutable.
+- `online` resets the consecutive unhealthy sequence naturally and resolves an open incident.
+- Resolution stores `status=resolved`, `resolved_at`, and a non-negative `duration_seconds`.
+- Disabling an active monitored service also resolves its open incident.
+- An online check or deactivation without an open incident causes no incident transition.
 
-Under the synchronization rule, a service has at most one open incident relevant to the workflow.
+PostgreSQL enforces one open incident per service with the partial unique index `uq_incidents_service_id_open`. The health-check workflow handles only that named uniqueness race through a savepoint. The winner opens the incident; the loser reuses it without emitting a second incident-opened transition and still commits its own check.
+
+## Transaction and notification ordering
+
+For scheduled checks:
+
+```text
+outbound HTTP request
+→ begin persistence work
+→ flush health-check result
+→ synchronize incident
+→ one outer commit
+→ deliver transition notifications
+```
+
+Check and incident persistence roll back together if either operation fails. Notifications are never attempted for a failed transaction.
+
+For monitoring deactivation, service state is committed, the open incident is resolved and committed, and then the existing recovery notification contract runs. Notification delivery failure does not roll back the already persisted deactivation or resolution.
 
 ## Notifications
 
-Notifications are triggered only on these transitions:
+Sentinel emits only:
 
-- incident opened;
-- service recovered and incident resolved.
+- `incident_opened`, and only for the transaction that actually created the incident;
+- `incident_resolved`, after healthy recovery or monitoring deactivation.
 
-Each channel selects whether it receives outage, degradation, and recovery events.
+Channels independently opt into offline, degraded, and recovery notifications. Implemented delivery types are generic HTTP webhooks and Discord webhooks. The email type is modeled, but an attempt is recorded as failed because SMTP is not implemented.
 
-Implemented destinations:
+Every attempted delivery creates a `NotificationLog` with `sent` or `failed` status. Delivery happens after the state transition commits. Targets are masked in warning logs, although notification records retain their configured target as application data.
 
-- generic HTTP webhook;
-- Discord webhook.
+## Operational limitations
 
-The email type exists in the model, but SMTP is not implemented. Every attempt creates a `NotificationLog` with `sent` or `failed` status.
-
-## Operational Considerations
-
-The embedded scheduler is suitable for a single-replica MVP. Horizontal scaling requires moving monitoring execution to a coordinated worker or queue-based system to prevent duplicate checks.
+- The threshold is global rather than service-specific.
+- `max_instances=1` protects only one backend process; it is not distributed coordination.
+- Checks are sequential and may take longer as the service set grows.
+- Notifications are direct post-commit calls without a queue, outbox, or durable retry worker.

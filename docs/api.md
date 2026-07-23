@@ -56,10 +56,15 @@ Modeled channel types are `webhook`, `discord`, and `email`. This version sends 
 | Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |
 | GET | `/api/dashboard` | Authenticated | Returns an operational summary |
+| GET | `/api/incidents` | Read | Lists incidents, optionally filtered by status and service |
+| GET | `/api/responsibles` | Read | Lists responsible contacts |
+| POST | `/api/responsibles` | Operate | Creates a responsible contact |
+| PUT | `/api/responsibles/{responsible_id}` | Operate | Updates a responsible contact |
+| PATCH | `/api/responsibles/{responsible_id}/activation` | Operate | Changes responsible-contact activation |
 | GET | `/health` | Public | Checks API health |
 | GET | `/metrics` | Infrastructure | Exposes Prometheus metrics |
 
-Additional incident and owner routes are registered in their respective API modules.
+The health endpoint confirms that the API process responds; it does not query PostgreSQL. The metrics endpoint includes received HTTP metrics and Sentinel's outbound monitoring metrics.
 
 ## Errors
 
