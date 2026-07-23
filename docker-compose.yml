@@ -3,6 +3,13 @@ name: sentinel
 services:
   postgres:
     image: postgres:16-alpine
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 384M
+        reservations:
+          memory: 192M
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sentinel}
       POSTGRES_USER: ${POSTGRES_USER:-sentinel}
@@ -20,6 +27,13 @@ services:
   backend:
     build:
       context: ./backend
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 384M
+        reservations:
+          memory: 192M
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-docker}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sentinel}:${POSTGRES_PASSWORD:-sentinel_dev_password}@postgres:5432/${POSTGRES_DB:-sentinel}
@@ -57,6 +71,11 @@ services:
   frontend:
     build:
       context: ./frontend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
     expose:
       - "80"
     networks:
@@ -69,6 +88,11 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
     ports:
       - "${NGINX_PORT:-80}:80"
     volumes:
@@ -83,6 +107,13 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.55.1
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 384M
+        reservations:
+          memory: 192M
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -103,6 +134,11 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
       - "--storage.path=/alertmanager"
@@ -116,6 +152,11 @@ services:
 
   cadvisor:
     image: ghcr.io/google/cadvisor:0.55.1
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 256M
     privileged: true
     command:
       - "--docker_only=true"
@@ -133,6 +174,11 @@ services:
 
   node-exporter:
     image: prom/node-exporter:v1.8.2
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
     command:
       - "--path.rootfs=/host"
     pid: host
@@ -146,6 +192,13 @@ services:
 
   loki:
     image: grafana/loki:2.9.8
+    deploy:
+      resources:
+        limits:
+          cpus: "0.75"
+          memory: 384M
+        reservations:
+          memory: 192M
     command:
       - "-config.file=/etc/loki/loki-config.yml"
     volumes:
@@ -156,6 +209,11 @@ services:
 
   promtail:
     image: grafana/promtail:3.6.10
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
     command:
       - "-config.file=/etc/promtail/promtail-config.yml"
     volumes:
@@ -168,6 +226,13 @@ services:
 
   grafana:
     image: grafana/grafana:11.5.0
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 384M
+        reservations:
+          memory: 192M
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
