@@ -19,6 +19,22 @@ The project is designed as a portfolio-sized, end-to-end system: a FastAPI appli
 - Centralized Docker logs in Loki through Promtail.
 - Explicit CPU and memory limits for all 11 Compose services.
 
+## Release evidence
+
+The screenshots below were captured from the complete local Compose environment with temporary demonstration records. They show the application and provisioned observability stack operating together; the repository does not seed these records.
+
+### Operational dashboard
+
+![Sentinel dashboard showing monitored services, current states, incidents, and availability](docs/assets/sentinel-dashboard.png)
+
+### Service incident details
+
+![Sentinel service view showing an offline check and its open incident](docs/assets/sentinel-incidents.png)
+
+### Grafana monitoring overview
+
+![Grafana Sentinel overview showing health-check, availability, incident, latency, and log data](docs/assets/grafana-overview.png)
+
 ## Architecture
 
 ```mermaid
@@ -222,7 +238,7 @@ This remains a demonstrative local environment: HTTP is not terminated with TLS,
 ├── backend/                 FastAPI application, migrations, and tests
 ├── frontend/                React/Vite application and frontend Nginx image
 ├── infra/                   Reverse proxy and observability configuration
-├── docs/                    Technical documentation
+├── docs/                    Technical documentation and release evidence
 ├── .github/workflows/       CI and image publishing workflow
 ├── docker-compose.yml       Complete 11-service local stack
 └── .env.example             Local configuration template
@@ -237,5 +253,4 @@ This remains a demonstrative local environment: HTTP is not terminated with TLS,
 | [Authentication and RBAC](docs/authentication-and-rbac.md) | JWT, passwords, roles, and permissions |
 | [Monitoring rules](docs/monitoring-rules.md) | Scheduling, classification, incidents, and notifications |
 | [Observability](docs/observability.md) | Metrics, alerts, dashboard, logs, and investigation procedures |
-
-No screenshots are versioned in the repository. This documentation intentionally avoids placeholders or generated evidence.
+| [v1.0.0 release notes](docs/release-notes-v1.0.0.md) | Initial stable scope, validation, and known limitations |
